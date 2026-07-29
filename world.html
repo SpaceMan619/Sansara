@@ -1,0 +1,606 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Dune World — Demo</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  body { margin:0; background:#e9c893; overflow:hidden; font:13px/1.5 system-ui,-apple-system,sans-serif; }
+  #hud { position:fixed; top:14px; left:14px; color:#4a3620; background:#fff6e6cc; backdrop-filter:blur(6px);
+         padding:9px 14px; border-radius:10px; z-index:2; box-shadow:0 2px 12px #7a5a3022; }
+  #hud b { color:#8a5a20; }
+  #status { position:fixed; bottom:14px; left:14px; color:#fff2dd; text-shadow:0 1px 3px #00000066;
+            opacity:.85; z-index:2; }
+  #perf { position:fixed; bottom:14px; right:14px; color:#fff2dd; text-shadow:0 1px 3px #00000066;
+          opacity:.7; z-index:2; font-variant-numeric:tabular-nums; }
+</style>
+</head>
+<body>
+<div id="hud"><b>WASD</b> move · <b>Shift</b> run · <b>Space</b> jump · <b>F</b> dance · drag to orbit</div>
+<div id="status">loading…</div>
+<div id="perf"></div>
+<script type="importmap">
+{ "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.166.1/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.166.1/examples/jsm/"
+} }
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+
+/* ============================ noise ============================ */
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+const rand = mulberry32(20260729);
+const perm = new Uint8Array(512);
+{ const p=[...Array(256).keys()]; for(let i=255;i>0;i--){const j=Math.floor(rand()*(i+1));[p[i],p[j]]=[p[j],p[i]];} for(let i=0;i<512;i++)perm[i]=p[i&255]; }
+const G=[[1,1],[-1,1],[1,-1],[-1,-1],[1,0],[-1,0],[0,1],[0,-1]];
+const fade=t=>t*t*t*(t*(t*6-15)+10);
+function noise2(x,y){
+  const X=Math.floor(x)&255, Y=Math.floor(y)&255;
+  x-=Math.floor(x); y-=Math.floor(y);
+  const u=fade(x), v=fade(y);
+  const g=(h,a,b)=>{const q=G[h&7];return q[0]*a+q[1]*b;};
+  const A=perm[X]+Y, B=perm[X+1]+Y;
+  return THREE.MathUtils.lerp(
+    THREE.MathUtils.lerp(g(perm[A],x,y),    g(perm[B],x-1,y),   u),
+    THREE.MathUtils.lerp(g(perm[A+1],x,y-1),g(perm[B+1],x-1,y-1),u), v);
+}
+function fbm(x,y,oct=4,lac=2.0,gain=0.5){
+  let a=1,f=1,s=0,n=0;
+  for(let i=0;i<oct;i++){ s+=a*noise2(x*f,y*f); n+=a; a*=gain; f*=lac; }
+  return s/n;
+}
+
+/* ===================== terrain: real dunes =====================
+   Barchan-style asymmetry: long windward rise, short steep slipface.
+   Wind blows along +X, so ridge lines run roughly along Z and meander
+   via a low-frequency domain warp. A flattened basin holds the village. */
+const VILLAGE = new THREE.Vector2(0, 0);
+const BASIN_R = 34, BASIN_FALLOFF = 26;
+
+function rawDune(x,z){
+  const warp = fbm(x*0.0032, z*0.0032, 3) * 46;           // ridges meander
+  const amp  = 3.4 + fbm(x*0.0055+90, z*0.0055, 3) * 5.2; // dune height varies
+  const t = (x + warp) * 0.0165;
+  const f = t - Math.floor(t);
+  const CREST = 0.74;
+  const profile = f < CREST
+    ? Math.pow(f/CREST, 1.55)                              // windward: smooth climb
+    : 1 - Math.pow((f-CREST)/(1-CREST), 0.75);             // slipface: sharp drop
+  let h = profile * amp;
+  h += fbm(x*0.026, z*0.026, 3) * 1.1;                     // secondary dunes
+  h += fbm(x*0.13,  z*0.13,  2) * 0.16;                    // wind ripples
+  return h;
+}
+function duneHeight(x,z){
+  const h = rawDune(x,z);
+  const d = Math.hypot(x-VILLAGE.x, z-VILLAGE.y);
+  if (d > BASIN_R + BASIN_FALLOFF) return h;
+  // Basin floor keeps gentle drift + ripples so it never reads as a flat disc
+  const basin = rawDune(VILLAGE.x, VILLAGE.y) - 0.6
+              + fbm(x*0.022, z*0.022, 3) * 0.55
+              + fbm(x*0.13,  z*0.13,  2) * 0.10;
+  const t = THREE.MathUtils.smoothstep(d, BASIN_R, BASIN_R + BASIN_FALLOFF);
+  return THREE.MathUtils.lerp(basin, h, t);
+}
+function slopeAt(x,z){
+  const e=0.9;
+  return Math.abs(duneHeight(x+e,z)-duneHeight(x-e,z)) + Math.abs(duneHeight(x,z+e)-duneHeight(x,z-e));
+}
+
+/* ========================== renderer ==========================
+   Thermal budget: ONE shadow-casting light, no post-processing,
+   pixelRatio capped, everything scattered via InstancedMesh. */
+const renderer = new THREE.WebGLRenderer({ antialias:true, powerPreference:'default' });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5));
+renderer.setSize(innerWidth, innerHeight);
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;   // free: folded into the final shader
+renderer.toneMappingExposure = 1.05;
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+document.body.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(52, innerWidth/innerHeight, 0.1, 600);
+
+/* ============================= sky ============================
+   Single inverted sphere with a gradient shader — one draw call,
+   no texture fetches, gives the warm-horizon / deep-zenith look. */
+const SKY_TOP = new THREE.Color(0x3f7fc4), SKY_MID = new THREE.Color(0xbcd2e8), SKY_LOW = new THREE.Color(0xf6d9a6);
+scene.add(new THREE.Mesh(
+  new THREE.SphereGeometry(400, 24, 16),
+  new THREE.ShaderMaterial({
+    side: THREE.BackSide, depthWrite: false, fog: false,
+    uniforms:{ top:{value:SKY_TOP}, mid:{value:SKY_MID}, low:{value:SKY_LOW} },
+    vertexShader:`varying vec3 vP; void main(){ vP=position; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0); }`,
+    fragmentShader:`
+      varying vec3 vP; uniform vec3 top, mid, low;
+      void main(){
+        float h = normalize(vP).y;
+        vec3 c = mix(low, mid, smoothstep(-0.05, 0.22, h));
+        c = mix(c, top, smoothstep(0.18, 0.75, h));
+        gl_FragColor = vec4(c, 1.0);
+      }`
+  })
+));
+scene.fog = new THREE.Fog(0xe7cfa6, 70, 300);
+
+/* ============================ light ===========================
+   Golden-hour key with a tight shadow frustum that follows the player,
+   plus a sky/ground hemisphere fill so shadowed sides aren't dead black. */
+const sun = new THREE.DirectionalLight(0xffe2b0, 2.5);
+sun.position.set(-60, 46, 34);
+sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048);
+sun.shadow.camera.near = 1;
+sun.shadow.camera.far = 180;
+const SH = 46;
+Object.assign(sun.shadow.camera, { left:-SH, right:SH, top:SH, bottom:-SH });
+sun.shadow.bias = -0.0006;
+sun.shadow.normalBias = 0.05;
+scene.add(sun);
+scene.add(sun.target);
+scene.add(new THREE.HemisphereLight(0xbfd8f5, 0xc79a5c, 0.85));   // sky bounce + sand bounce
+scene.add(new THREE.AmbientLight(0xffd9a8, 0.18));
+
+/* =========================== terrain mesh ====================== */
+const SIZE = 420, SEG = 300;   // 300² grid — ~180k tris, trivial for the GPU, and it's static
+const CELL = SIZE/SEG, HALF = SIZE/2;
+const HGRID = new Float32Array((SEG+1)*(SEG+1));   // exact heights of the rendered surface
+const terrainGeo = new THREE.PlaneGeometry(SIZE, SIZE, SEG, SEG);
+terrainGeo.rotateX(-Math.PI/2);
+{
+  const pos = terrainGeo.attributes.position;
+  const colors = new Float32Array(pos.count*3);
+  const cShade = new THREE.Color(0xc9a06a);   // slipface / hollows
+  const cSand  = new THREE.Color(0xe2bd85);   // mid sand
+  const cCrest = new THREE.Color(0xf7e6c2);   // sun-bleached crests
+  const c = new THREE.Color();
+  for (let i=0;i<pos.count;i++){
+    const x=pos.getX(i), z=pos.getZ(i);
+    const h=duneHeight(x,z);
+    pos.setY(i,h);
+    HGRID[i] = h;   // PlaneGeometry emits rows of (SEG+1) verts, iy outer / ix inner
+    const steep = THREE.MathUtils.clamp(slopeAt(x,z)*0.7, 0, 1);
+    const lift  = THREE.MathUtils.clamp((h+2)/10, 0, 1);
+    c.copy(cSand).lerp(cCrest, lift*lift).lerp(cShade, steep*0.8);
+    // subtle grain so flat areas aren't a dead gradient
+    const grain = 1 + (noise2(x*0.9, z*0.9)) * 0.045;
+    colors[i*3]=c.r*grain; colors[i*3+1]=c.g*grain; colors[i*3+2]=c.b*grain;
+  }
+  terrainGeo.setAttribute('color', new THREE.BufferAttribute(colors,3));
+  terrainGeo.computeVertexNormals();
+}
+const sand = new THREE.Mesh(terrainGeo, new THREE.MeshStandardMaterial({
+  vertexColors:true, roughness:0.92, metalness:0.0
+}));
+sand.receiveShadow = true;
+scene.add(sand);
+
+/* Ground query against the *rendered* surface, not the analytic function.
+   The mesh is a 1.4-unit grid, so on a dune crest the analytic height sits
+   above the interpolated triangle — sampling the grid keeps feet welded to
+   the sand instead of hovering. Matches PlaneGeometry's a,b,d / b,c,d split. */
+function groundAt(x,z){
+  const fx = THREE.MathUtils.clamp((x+HALF)/CELL, 0, SEG-1e-4);
+  const fz = THREE.MathUtils.clamp((z+HALF)/CELL, 0, SEG-1e-4);
+  const i = Math.floor(fx), j = Math.floor(fz);
+  const tx = fx-i, tz = fz-j;
+  const row = SEG+1;
+  const hA = HGRID[j*row+i],       hD = HGRID[j*row+i+1];
+  const hB = HGRID[(j+1)*row+i],   hC = HGRID[(j+1)*row+i+1];
+  return (tx + tz <= 1)
+    ? hA + tx*(hD-hA) + tz*(hB-hA)
+    : hC + (1-tx)*(hB-hC) + (1-tz)*(hD-hC);
+}
+function groundNormal(x,z){
+  const e = CELL;
+  return new THREE.Vector3(
+    groundAt(x-e,z)-groundAt(x+e,z), 2*e, groundAt(x,z-e)-groundAt(x,z+e)).normalize();
+}
+
+/* ====================== instanced scattering ===================
+   One InstancedMesh per source geometry => hundreds of props,
+   a handful of draw calls. */
+const loader = new GLTFLoader();
+const loadGLB = url => new Promise((res,rej)=>loader.load(url,res,undefined,rej));
+const TOWN   = 'assets/fantasy-town/Models/GLB format/';
+const NATURE = 'assets/nature/Models/GLTF format/';
+
+function meshPartsOf(gltf){
+  const parts = [];
+  gltf.scene.updateWorldMatrix(true, true);
+  gltf.scene.traverse(o=>{ if(o.isMesh) parts.push({ geo:o.geometry, mat:o.material, mw:o.matrixWorld.clone() }); });
+  return parts;
+}
+function scatterInstanced(gltf, placements){
+  if (!placements.length) return;
+  for (const part of meshPartsOf(gltf)){
+    const mat = part.mat.clone();
+    if (mat.map) mat.map.colorSpace = THREE.SRGBColorSpace;
+    mat.roughness = Math.min(1, (mat.roughness ?? 1) * 0.95);
+    const inst = new THREE.InstancedMesh(part.geo, mat, placements.length);
+    inst.castShadow = true; inst.receiveShadow = true;
+    const m = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler();
+    placements.forEach((p,i)=>{
+      e.set(0, p.ry, 0); q.setFromEuler(e);
+      m.compose(new THREE.Vector3(p.x, p.y, p.z), q, new THREE.Vector3(p.s, p.s, p.s));
+      m.multiply(part.mw);
+      inst.setMatrixAt(i, m);
+    });
+    inst.instanceMatrix.needsUpdate = true;
+    scene.add(inst);
+  }
+}
+// Poisson-ish rejection sampling over an annulus, avoiding occupied spots
+const occupied = [];
+const SPAWN = new THREE.Vector2(0, 6), SPAWN_CLEAR = 6;   // don't drop props on the player
+function sample({count, rMin, rMax, minDist, maxSlope=0.85, avoidVillage=0, scale=[1,1], tries=60}){
+  const out = [];
+  for (let i=0;i<count;i++){
+    for (let t=0;t<tries;t++){
+      const a = rand()*Math.PI*2, r = rMin + Math.sqrt(rand())*(rMax-rMin);
+      const x = Math.cos(a)*r, z = Math.sin(a)*r;
+      if (Math.hypot(x,z) < avoidVillage) continue;
+      if (Math.hypot(x-SPAWN.x, z-SPAWN.y) < SPAWN_CLEAR) continue;
+      if (slopeAt(x,z) > maxSlope) continue;
+      if (occupied.some(o=>Math.hypot(o.x-x,o.z-z) < minDist)) continue;
+      const p = { x, z, y: groundAt(x,z)-0.05, ry: rand()*Math.PI*2,
+                  s: scale[0] + rand()*(scale[1]-scale[0]) };
+      out.push(p); occupied.push(p); break;
+    }
+  }
+  return out;
+}
+
+/* ============================ village ==========================
+   Houses ring a central plaza with a well; roads radiate outward.
+   Hand-placed ring instead of pure random => reads as a settlement. */
+async function buildWorld(){
+  const [hStone, hWood, hHut, well, lantern, stall, cart, cactusT, cactusS,
+         rockL, rockS, bushL, bushS, grassT, fence, pathStone] = await Promise.all([
+    loadGLB('assets/houses/house-stone.glb'),
+    loadGLB('assets/houses/house-wood-tall.glb'),
+    loadGLB('assets/houses/house-hut.glb'),
+    loadGLB(TOWN+'fountain-round-detail.glb'),
+    loadGLB(TOWN+'lantern.glb'),
+    loadGLB(TOWN+'stall.glb'),
+    loadGLB(TOWN+'cart.glb'),
+    loadGLB(NATURE+'cactus_tall.glb'),
+    loadGLB(NATURE+'cactus_short.glb'),
+    loadGLB(NATURE+'rock_largeA.glb').catch(()=>loadGLB(TOWN+'rock-large.glb')),
+    loadGLB(NATURE+'rock_smallA.glb').catch(()=>loadGLB(TOWN+'rock-small.glb')),
+    loadGLB(NATURE+'plant_bushLarge.glb'),
+    loadGLB(NATURE+'plant_bushSmall.glb'),
+    loadGLB(NATURE+'grass_large.glb'),
+    loadGLB(TOWN+'fence.glb'),
+    loadGLB(NATURE+'path_stone.glb'),
+  ]);
+
+  // --- plaza well at the exact centre
+  scatterInstanced(well, [{x:0, z:0, y:groundAt(0,0)-0.05, ry:0, s:1.35}]);
+  occupied.push({x:0,z:0});
+
+  // --- houses in two loose rings facing the plaza
+  const homes = [[hStone,'stone'],[hWood,'wood'],[hHut,'hut']];
+  const ringPlacements = new Map(homes.map(([g])=>[g,[]]));
+  const RINGS = [{r:15, n:9, s:2.4}, {r:25, n:11, s:2.4}];
+  let idx = 0;
+  for (const ring of RINGS){
+    for (let i=0;i<ring.n;i++){
+      const a = (i/ring.n)*Math.PI*2 + (rand()-0.5)*0.18;
+      const r = ring.r + (rand()-0.5)*3.5;
+      const x = Math.cos(a)*r, z = Math.sin(a)*r;
+      const [g] = homes[(idx++ + (rand()<0.3?1:0)) % homes.length];
+      ringPlacements.get(g).push({
+        x, z, y: groundAt(x,z)-0.08,
+        ry: -a + Math.PI/2 + (rand()-0.5)*0.12,   // face the plaza
+        s: ring.s + (rand()-0.5)*0.25
+      });
+      occupied.push({x,z});
+    }
+  }
+  for (const [g, ps] of ringPlacements) scatterInstanced(g, ps);
+
+  // --- market clutter around the plaza
+  scatterInstanced(stall,   sample({count:7,  rMin:8,  rMax:13, minDist:4,   scale:[1.7,1.9]}));
+  scatterInstanced(cart,    sample({count:4,  rMin:9,  rMax:14, minDist:4.5, scale:[1.7,1.9]}));
+  scatterInstanced(lantern, sample({count:14, rMin:5,  rMax:28, minDist:3.5, scale:[2.0,2.3]}));
+  scatterInstanced(fence,   sample({count:22, rMin:16, rMax:32, minDist:2.2, scale:[2.0,2.2]}));
+  scatterInstanced(pathStone, sample({count:70, rMin:3, rMax:30, minDist:1.4, scale:[2.0,2.6]}));
+
+  // --- desert beyond the village
+  scatterInstanced(cactusT, sample({count:70,  rMin:34, rMax:190, minDist:5,   maxSlope:1.1, scale:[1.6,2.6]}));
+  scatterInstanced(cactusS, sample({count:90,  rMin:30, rMax:190, minDist:4,   maxSlope:1.2, scale:[1.5,2.4]}));
+  scatterInstanced(rockL,   sample({count:45,  rMin:30, rMax:195, minDist:7,   maxSlope:1.4, scale:[2.0,3.6]}));
+  scatterInstanced(rockS,   sample({count:110, rMin:24, rMax:195, minDist:3,   maxSlope:1.4, scale:[1.6,3.0]}));
+  scatterInstanced(bushL,   sample({count:70,  rMin:20, rMax:170, minDist:4,   maxSlope:1.0, scale:[1.4,2.2]}));
+  scatterInstanced(bushS,   sample({count:120, rMin:14, rMax:180, minDist:2.5, maxSlope:1.1, scale:[1.4,2.2]}));
+  scatterInstanced(grassT,  sample({count:220, rMin:10, rMax:185, minDist:1.8, maxSlope:1.2, scale:[1.2,2.0]}));
+}
+
+/* ============================ avatar ===========================
+   Clip travel distances measured from the pre-flattened Mixamo clips
+   (model units). Dividing by clip duration gives each cycle's natural
+   ground speed, so animation playback can be matched to actual velocity
+   and the feet don't skate. */
+const CLIP_TRAVEL = { Walk: 85.28, Run: 149.23 };
+let avatar, mixer, actions={}, currentAction, modelScale=1, clipSpeed={}, footBones=[];
+const AVATAR_URLS = ['output/minimal-scifi-sikh-animated.glb','source/minimal-scifi-sikh.glb'];
+
+/* True extents of the *posed* character.
+
+   Box3.setFromObject measures a SkinnedMesh's bind-pose geometry, which for
+   this rig is centred on the armature origin — using it to place the feet
+   lifts the model half a body height into the air. Skinning each vertex with
+   applyBoneTransform gives the actual rendered silhouette. 5.5k verts, done
+   once at load. */
+function posedExtents(root){
+  const box = new THREE.Box3();
+  const v = new THREE.Vector3();
+  let skinned = false;
+  root.traverse(o=>{
+    if (!o.isMesh) return;
+    const attr = o.geometry.attributes.position;
+    if (o.isSkinnedMesh && o.skeleton){
+      skinned = true;
+      for (let i=0;i<attr.count;i++){
+        v.fromBufferAttribute(attr, i);
+        o.applyBoneTransform(i, v);
+        box.expandByPoint(o.localToWorld(v));
+      }
+    } else {
+      for (let i=0;i<attr.count;i++){
+        v.fromBufferAttribute(attr, i);
+        box.expandByPoint(o.localToWorld(v));
+      }
+    }
+  });
+  return { box, skinned };
+}
+
+async function loadAvatar(){
+  for (const url of AVATAR_URLS){
+    let gltf;
+    try { gltf = await loadGLB(url); } catch(e){ continue; }
+    gltf.scene.traverse(o=>{ if(o.isMesh){ o.castShadow=true; o.frustumCulled=false; } });
+    avatar = new THREE.Group();
+    avatar.add(gltf.scene);
+    scene.add(avatar);
+
+    if (gltf.animations.length){
+      mixer = new THREE.AnimationMixer(avatar);
+      for (const c of gltf.animations) actions[c.name] = mixer.clipAction(c);
+      if (actions.Jump){ actions.Jump.setLoop(THREE.LoopOnce); actions.Jump.clampWhenFinished = true; }
+      play(actions.Idle ? 'Idle' : 'Walk');
+      // play() fades in from weight 0; force full weight so the pose below is
+      // the real one and not the bind pose.
+      if (currentAction) actions[currentAction].setEffectiveWeight(1);
+      mixer.update(0);
+      gltf.scene.traverse(o=>{ if (o.isBone && /Toe|Foot/i.test(o.name)) footBones.push(o); });
+    }
+
+    // Measure in the resting pose, then scale to 1.75 units and drop the feet
+    // onto the group origin, which the controller pins to the terrain.
+    avatar.updateMatrixWorld(true);
+    const { box } = posedExtents(gltf.scene);
+    const size = box.getSize(new THREE.Vector3());
+    modelScale = 1.75 / size.y;
+    gltf.scene.scale.setScalar(modelScale);
+    gltf.scene.position.set(-(box.min.x + size.x/2)*modelScale,
+                            -box.min.y*modelScale,
+                            -(box.min.z + size.z/2)*modelScale);
+    for (const name of Object.keys(actions)){
+      const c = actions[name].getClip();
+      if (CLIP_TRAVEL[name]) clipSpeed[name] = CLIP_TRAVEL[name]*modelScale / c.duration;
+    }
+    document.getElementById('status').textContent = gltf.animations.length
+      ? `clips: ${gltf.animations.map(c=>c.name).join(' · ')}${actions.Idle?'':' — no Idle clip yet'}`
+      : 'static avatar — run the Mixamo step to animate';
+    return;
+  }
+  document.getElementById('status').textContent = 'avatar failed to load';
+}
+function play(name, fade=0.18){
+  if (!mixer || !actions[name] || currentAction===name) return;
+  if (currentAction) actions[currentAction].fadeOut(fade);
+  actions[name].paused = false;
+  actions[name].reset().fadeIn(fade).play();
+  currentAction = name;
+}
+function idlePose(t){
+  if (actions.Idle) return play('Idle');
+  if (!actions.Walk) return;
+  // Stand-in until an Idle clip exists: hold the walk cycle's neutral frame
+  // and add a slow breathing bob so the character isn't a statue.
+  if (currentAction !== 'Walk') play('Walk');
+  actions.Walk.paused = true;
+  actions.Walk.time = 0;
+  return Math.sin(t*1.6)*0.012;
+}
+
+/* =========================== controls ========================== */
+const keys={};
+addEventListener('keydown',e=>{ keys[e.code]=true; if(e.code==='Space')e.preventDefault(); if(e.code==='KeyF')dancing=!dancing; });
+addEventListener('keyup',  e=>keys[e.code]=false);
+let camYaw=0.6, camPitch=0.32, dragging=false, px=0, py=0, camDist=7.5;
+renderer.domElement.addEventListener('pointerdown',e=>{dragging=true;px=e.clientX;py=e.clientY;});
+addEventListener('pointerup',()=>dragging=false);
+addEventListener('pointermove',e=>{ if(!dragging)return;
+  camYaw-=(e.clientX-px)*0.005; camPitch=THREE.MathUtils.clamp(camPitch+(e.clientY-py)*0.005,0.06,1.15);
+  px=e.clientX;py=e.clientY; });
+addEventListener('wheel',e=>{ camDist=THREE.MathUtils.clamp(camDist+e.deltaY*0.01,3,20); },{passive:true});
+
+/* ===================== character controller =====================
+   Velocity-based rather than position-based: input sets a *target*
+   velocity, real velocity accelerates toward it, so starts and stops
+   have weight. Airborne control is deliberately weak, and coyote time
+   plus a jump buffer make jumps forgiving the way action games do. */
+const WALK_SPEED = 2.9, RUN_SPEED = 8.2;
+const ACCEL = 26, DECEL = 20, AIR_ACCEL = 7;
+const GRAVITY = 24, JUMP_V = 8.4;
+const COYOTE = 0.12, JUMP_BUFFER = 0.15;
+const TURN_RATE = 13;
+const SOLE_GAP = 0.03;          // toe joint sits just above the sole
+const _v = new THREE.Vector3();
+
+const pos = new THREE.Vector3(0, 0, 6);
+pos.y = groundAt(pos.x, pos.z);
+const vel = new THREE.Vector3();          // horizontal velocity (x,z); y is vertical
+let vy = 0, grounded = true, heading = Math.PI;
+let coyoteT = 0, jumpBufferT = 0, wasGrounded = true, dancing = false;
+const clock = new THREE.Clock();
+let elapsed = 0, fpsT = 0, frames = 0;
+window.__world = { keys, pos, vel, THREE, get avatar(){return avatar;}, get actions(){return actions;},
+  get grounded(){return grounded;}, get clips(){return Object.keys(actions);},
+  probe(){
+    const b = new THREE.Box3().setFromObject(avatar);
+    return { posY:pos.y, ground:groundAt(pos.x,pos.z), boxMinY:b.min.y, boxMaxY:b.max.y,
+             gap:+(b.min.y-groundAt(pos.x,pos.z)).toFixed(3), modelScale, current:currentAction };
+  } };
+
+function tick(){
+  const dt = Math.min(clock.getDelta(), 0.05);
+  elapsed += dt;
+
+  /* ---- input in camera space ---- */
+  const fwd = new THREE.Vector3(-Math.sin(camYaw), 0, -Math.cos(camYaw));
+  const right = new THREE.Vector3(-fwd.z, 0, fwd.x);
+  const wish = new THREE.Vector3();
+  if (keys['KeyW']) wish.add(fwd);
+  if (keys['KeyS']) wish.sub(fwd);
+  if (keys['KeyD']) wish.add(right);
+  if (keys['KeyA']) wish.sub(right);
+  const hasInput = wish.lengthSq() > 0 && !dancing;
+  if (hasInput) wish.normalize();
+
+  const running = keys['ShiftLeft'] || keys['ShiftRight'];
+  const targetSpeed = hasInput ? (running ? RUN_SPEED : WALK_SPEED) : 0;
+
+  /* ---- accelerate toward the wish velocity ---- */
+  const target = wish.multiplyScalar(targetSpeed);
+  const rate = (grounded ? (hasInput ? ACCEL : DECEL) : AIR_ACCEL) * dt;
+  vel.x += THREE.MathUtils.clamp(target.x - vel.x, -rate, rate);
+  vel.z += THREE.MathUtils.clamp(target.z - vel.z, -rate, rate);
+
+  // Sand drags: climbing a dune face costs speed, descending gives a little back.
+  const nrm = groundNormal(pos.x, pos.z);
+  if (grounded && vel.lengthSq() > 0.01){
+    const uphill = -(nrm.x*vel.x + nrm.z*vel.z) / Math.max(vel.length(), 0.001);
+    const drag = 1 - THREE.MathUtils.clamp(uphill*0.55, -0.15, 0.45);
+    vel.multiplyScalar(drag);
+  }
+
+  pos.x = THREE.MathUtils.clamp(pos.x + vel.x*dt, -HALF+8, HALF-8);
+  pos.z = THREE.MathUtils.clamp(pos.z + vel.z*dt, -HALF+8, HALF-8);
+
+  /* ---- jump: coyote time + input buffering ---- */
+  if (keys['Space']) jumpBufferT = JUMP_BUFFER; else jumpBufferT = Math.max(0, jumpBufferT - dt);
+  coyoteT = grounded ? COYOTE : Math.max(0, coyoteT - dt);
+  if (jumpBufferT > 0 && coyoteT > 0){
+    vy = JUMP_V; grounded = false; coyoteT = 0; jumpBufferT = 0;
+    play('Jump', 0.05);
+  }
+
+  /* ---- vertical integration against the rendered surface ---- */
+  const ground = groundAt(pos.x, pos.z);
+  if (!grounded){
+    vy -= GRAVITY*dt;
+    pos.y += vy*dt;
+    if (pos.y <= ground){ pos.y = ground; vy = 0; grounded = true; currentAction = null; }
+  } else {
+    // Stick to the surface while walking over dunes; step down small drops.
+    if (pos.y - ground > 0.45){ grounded = false; vy = 0; }
+    else pos.y = ground;
+  }
+  wasGrounded = grounded;
+
+  /* ---- orientation + animation ---- */
+  let bob = 0;
+  if (avatar){
+    const speed = Math.hypot(vel.x, vel.z);
+    if (speed > 0.25) heading = Math.atan2(vel.x, vel.z);
+    let d = heading - avatar.rotation.y;
+    d = Math.atan2(Math.sin(d), Math.cos(d));
+    avatar.rotation.y += d * Math.min(1, TURN_RATE*dt);
+
+    if (mixer){
+      if (!grounded){
+        play('Jump', 0.05);
+      } else if (dancing && actions.Dance){
+        play('Dance');
+      } else if (speed > 0.25){
+        const useRun = actions.Run && speed > (WALK_SPEED + RUN_SPEED)*0.42;
+        const name = useRun ? 'Run' : 'Walk';
+        play(name);
+        // Match playback to real speed so the feet plant instead of sliding.
+        if (clipSpeed[name]) actions[name].timeScale =
+          THREE.MathUtils.clamp(speed / clipSpeed[name], 0.55, 1.9);
+      } else {
+        bob = idlePose(elapsed) || 0;
+      }
+    }
+    avatar.position.set(pos.x, pos.y + bob, pos.z);
+
+    /* ---- foot planting ----
+       Every clip rests at a slightly different height, and the bind-pose
+       bounding box can't tell us which. Measuring the lowest foot bone after
+       the mixer has posed the skeleton pins the planted foot to the sand for
+       any clip. Only while grounded — mid-air the jump arc owns the height. */
+    mixer?.update(dt);
+    if (footBones.length && grounded){
+      const model = avatar.children[0];
+      avatar.updateMatrixWorld(true);
+      let lowest = Infinity;
+      for (const b of footBones){ b.getWorldPosition(_v); if (_v.y < lowest) lowest = _v.y; }
+      if (isFinite(lowest)){
+        const err = (lowest - SOLE_GAP) - pos.y;
+        model.position.y -= err * Math.min(1, 9*dt);
+      }
+    }
+  }
+
+  /* ---- camera: follow with lag, never bury in a dune ---- */
+  const cx = pos.x + Math.sin(camYaw)*Math.cos(camPitch)*camDist;
+  const cz = pos.z + Math.cos(camYaw)*Math.cos(camPitch)*camDist;
+  const cy = Math.max(pos.y + 1.7 + Math.sin(camPitch)*camDist, groundAt(cx,cz) + 1.2);
+  camera.position.lerp(new THREE.Vector3(cx, cy, cz), Math.min(1, 12*dt));
+  camera.lookAt(pos.x, pos.y+1.15, pos.z);
+
+  // keep the tight shadow frustum centred on the player
+  sun.position.set(pos.x-60, pos.y+46, pos.z+34);
+  sun.target.position.copy(pos);
+  sun.target.updateMatrixWorld();
+
+  if (!avatar) mixer?.update(dt);
+  renderer.render(scene,camera);
+
+  frames++; fpsT+=dt;
+  if (fpsT>=1){ document.getElementById('perf').textContent =
+    `${Math.round(frames/fpsT)} fps · ${renderer.info.render.calls} draw calls`; frames=0; fpsT=0; }
+}
+
+addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);});
+
+// An exception inside the animation callback kills the loop permanently
+// (three.js re-requests the frame *after* the callback returns), so surface
+// it rather than letting the world silently freeze.
+function safeTick(){
+  try { tick(); }
+  catch (err){
+    renderer.setAnimationLoop(null);
+    document.getElementById('status').textContent = 'loop error: ' + err.message;
+    console.error(err);
+  }
+}
+window.__world.step = () => tick();
+buildWorld()
+  .then(loadAvatar)
+  .then(()=>renderer.setAnimationLoop(safeTick))
+  .catch(err=>{ document.getElementById('status').textContent = 'startup error: ' + err.message;
+                console.error(err); });
+</script>
+</body>
+</html>

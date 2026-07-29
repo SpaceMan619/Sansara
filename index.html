@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Sansara — 3D experiments</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root{
+    --bg:#0f1115; --panel:#171a21; --line:#262b36;
+    --ink:#e8eaf0; --muted:#98a0b3; --accent:#e0a75a;
+  }
+  @media (prefers-color-scheme: light){
+    :root{ --bg:#f7f5f1; --panel:#fff; --line:#e5e0d8; --ink:#22252c; --muted:#6b7285; --accent:#b7761f; }
+  }
+  *{box-sizing:border-box}
+  body{ margin:0; background:var(--bg); color:var(--ink);
+        font:16px/1.65 ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif; }
+  .wrap{ max-width:820px; margin:0 auto; padding:72px 24px 96px; }
+  header{ border-bottom:1px solid var(--line); padding-bottom:32px; margin-bottom:40px; }
+  h1{ font-size:44px; letter-spacing:-0.02em; margin:0 0 10px; }
+  h1 span{ color:var(--accent); }
+  .tag{ color:var(--muted); font-size:17px; margin:0; max-width:56ch; }
+  h2{ font-size:14px; text-transform:uppercase; letter-spacing:.09em; color:var(--muted);
+      margin:44px 0 16px; font-weight:600; }
+  .card{ display:block; text-decoration:none; color:inherit; background:var(--panel);
+         border:1px solid var(--line); border-radius:14px; padding:22px 24px; margin-bottom:14px;
+         transition:border-color .15s, transform .15s; }
+  .card:hover{ border-color:var(--accent); transform:translateY(-2px); }
+  .card h3{ margin:0 0 6px; font-size:19px; }
+  .card p{ margin:0; color:var(--muted); font-size:15px; }
+  .badge{ display:inline-block; font-size:11px; letter-spacing:.06em; text-transform:uppercase;
+          color:var(--accent); border:1px solid var(--accent); border-radius:99px;
+          padding:2px 9px; margin-bottom:10px; }
+  ul{ padding-left:20px; color:var(--muted); }
+  li{ margin:7px 0; }
+  li b{ color:var(--ink); font-weight:600; }
+  code{ background:var(--panel); border:1px solid var(--line); border-radius:5px;
+        padding:1px 6px; font-size:13.5px; }
+  footer{ margin-top:56px; padding-top:24px; border-top:1px solid var(--line);
+          color:var(--muted); font-size:14px; }
+  a{ color:var(--accent); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>San<span>sara</span></h1>
+    <p class="tag">A running notebook of 3D and Three.js experiments — rigging pipelines,
+    procedural worlds, and character controllers. Each one stays in the repo, so the progression
+    is visible over time.</p>
+  </header>
+
+  <h2>Experiments</h2>
+
+  <a class="card" href="world.html">
+    <div class="badge">01 · playable</div>
+    <h3>Dune World</h3>
+    <p>A procedural desert with real dune geometry and a rigged character you can walk, run and
+    jump around a village. WASD to move, Shift to run, Space to jump, F to dance.</p>
+  </a>
+
+  <a class="card" href="viewer.html">
+    <div class="badge">02 · tool</div>
+    <h3>Animation viewer</h3>
+    <p>Step through each animation clip on the rigged character in isolation, to check the rig
+    before dropping it into a scene.</p>
+  </a>
+
+  <h2>What's interesting in here</h2>
+  <ul>
+    <li><b>Dunes aren't noise.</b> Real dunes are asymmetric — a long windward climb and a short,
+    steep slipface. The terrain uses that profile directly instead of symmetric fbm, which is the
+    difference between "desert" and "lumpy beach".</li>
+    <li><b>Root motion has to go.</b> Mixamo clips downloaded without "In Place" travel ~85 units
+    forward per walk cycle and fight the controller. A small script flattens that out of the
+    exported GLB.</li>
+    <li><b>Skinned meshes lie about their bounds.</b> <code>Box3.setFromObject</code> measures the
+    bind pose, so grounding a character by its bounding box floats it half a body height off the
+    floor. The foot bones are the source of truth.</li>
+    <li><b>Draw calls, not polygons.</b> Hundreds of props render in ~50 draw calls via
+    <code>InstancedMesh</code>, with one shadow-casting light and no post-processing — enough to
+    hold 60 fps on a fanless laptop.</li>
+  </ul>
+
+  <h2>Running it</h2>
+  <p style="color:var(--muted)">The pages load models over <code>fetch</code>, so they need a
+  server rather than <code>file://</code>:</p>
+  <p><code>python3 -m http.server 8642</code></p>
+
+  <footer>
+    Environment art by <a href="https://kenney.nl">Kenney</a> (CC0) · character mesh from
+    <a href="https://mint.gg">mint.gg</a> · animations from
+    <a href="https://www.mixamo.com">Mixamo</a> · built with
+    <a href="https://threejs.org">Three.js</a>.
+  </footer>
+</div>
+</body>
+</html>

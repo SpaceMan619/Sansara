@@ -1,0 +1,12 @@
+# Kit archives — models are committed extracted; see README for sources
+assets/*.zip
+
+# Intermediate pipeline artifacts
+output/raw.glb
+output/character.fbx
+
+# Internal working notes, kept local
+docs/*-design.md
+
+.DS_Store
+.claude/

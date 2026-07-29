@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Sikh Avatar — Animation Viewer</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  body { margin: 0; background: #14161a; color: #dfe3ea; font: 14px/1.4 system-ui; overflow: hidden; }
+  #ui { position: fixed; top: 12px; left: 12px; display: flex; gap: 8px; z-index: 2; }
+  button { background: #23262d; color: #dfe3ea; border: 1px solid #3a3f49; border-radius: 8px;
+           padding: 8px 14px; cursor: pointer; font: inherit; }
+  button.active { background: #4066e0; border-color: #4066e0; color: #fff; }
+  #status { position: fixed; bottom: 12px; left: 12px; opacity: .6; }
+</style>
+</head>
+<body>
+<div id="ui"></div>
+<div id="status">loading…</div>
+<script type="importmap">
+{ "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.166.1/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.166.1/examples/jsm/"
+} }
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+// Thermal-safe settings for the fanless M4 Air: pixelRatio 1, no shadows, no post.
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(1);
+renderer.setSize(innerWidth, innerHeight);
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+document.body.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x14161a);
+const camera = new THREE.PerspectiveCamera(45, innerWidth / innerHeight, 0.05, 50);
+camera.position.set(0, 1.4, 3);
+
+scene.add(new THREE.HemisphereLight(0xffffff, 0x33383f, 1.2));
+const key = new THREE.DirectionalLight(0xffffff, 1.4);
+key.position.set(2, 4, 3);
+scene.add(key);
+scene.add(new THREE.GridHelper(6, 12, 0x3a3f49, 0x23262d));
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.target.set(0, 0.9, 0);
+
+const clock = new THREE.Clock();
+let mixer, actions = {}, current;
+
+new GLTFLoader().load('./output/minimal-scifi-sikh-animated.glb', (gltf) => {
+  scene.add(gltf.scene);
+  mixer = new THREE.AnimationMixer(gltf.scene);
+  const ui = document.getElementById('ui');
+  for (const clip of gltf.animations) {
+    actions[clip.name] = mixer.clipAction(clip);
+    const b = document.createElement('button');
+    b.textContent = clip.name;
+    b.onclick = () => play(clip.name);
+    ui.appendChild(b);
+  }
+  document.getElementById('status').textContent =
+    `${gltf.animations.length} clips loaded`;
+  play(gltf.animations[0]?.name);
+}, undefined, (e) => {
+  document.getElementById('status').textContent = 'load error: ' + e.message;
+});
+
+function play(name) {
+  if (!name || !actions[name]) return;
+  if (current) actions[current].fadeOut(0.25);
+  actions[name].reset().fadeIn(0.25).play();
+  current = name;
+  document.querySelectorAll('#ui button').forEach(b =>
+    b.classList.toggle('active', b.textContent === name));
+}
+
+addEventListener('resize', () => {
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+
+renderer.setAnimationLoop(() => {
+  mixer?.update(clock.getDelta());
+  controls.update();
+  renderer.render(scene, camera);
+});
+</script>
+</body>
+</html>
