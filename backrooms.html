@@ -216,14 +216,15 @@ for (let i=0;i<POOL;i++){
 
 /* ============================ player ============================ */
 const EYE = 1.62, RADIUS = 0.42;
-const WALK = 3.0, RUN = 7.0, ACCEL = 30, DECEL = 24, AIR = 8;
+let WALK = 3.0, RUN = 7.0;
+const ACCEL = 30, DECEL = 24, AIR = 8;
 const GRAVITY = 22, JUMP_V = 7.0, COYOTE = 0.12, JUMP_BUF = 0.15;
 
 let spawn = null;
 for (let y=GRID>>1;y<GRID-1 && !spawn;y++) if (at(GRID>>1,y)) spawn=[cellToWorld(GRID>>1), cellToWorld(y)];
 const pos = new THREE.Vector3(spawn[0], 0, spawn[1]);
 const vel = new THREE.Vector3();
-let vy=0, grounded=true, coyoteT=0, jumpBufT=0;
+let vy=0, grounded=true, coyoteT=0, jumpBufT=0, windupT=0, landT=0;
 let yaw=0, pitch=0;
 
 /* Slide along walls instead of sticking: resolve each axis separately
@@ -248,7 +249,8 @@ addEventListener('pointermove',e=>{ if(!dragging)return;
 
 /* =========================== character =========================== */
 let avatar, mixer, actions={}, currentAction, footBones=[], clipSpeed={};
-const CLIP_TRAVEL = { Walk:85.28, Run:149.23 };
+const CLIP_TRAVEL = { Walk:85.28, Run:149.23, Moonwalk:49.83 };
+const JUMP_WINDUP = 0.33, LAND_HOLD = 0.40;   // matches the Jump clip's crouch
 const SOLE_GAP = 0.03, _v = new THREE.Vector3();
 const loader = new GLTFLoader();
 
@@ -279,7 +281,8 @@ async function loadAvatar(){
   avatar = new THREE.Group(); avatar.add(gltf.scene); scene.add(avatar);
   mixer = new THREE.AnimationMixer(avatar);
   for (const c of gltf.animations) actions[c.name] = mixer.clipAction(c);
-  if (actions.Jump){ actions.Jump.setLoop(THREE.LoopOnce); actions.Jump.clampWhenFinished = true; }
+  for (const once of ['Jump','Land'])
+    if (actions[once]){ actions[once].setLoop(THREE.LoopOnce); actions[once].clampWhenFinished = true; }
   play(actions.Idle ? 'Idle' : 'Walk');
   if (currentAction) actions[currentAction].setEffectiveWeight(1);
   mixer.update(0);
@@ -291,8 +294,20 @@ async function loadAvatar(){
   const s = 1.75/size.y;
   gltf.scene.scale.setScalar(s);
   gltf.scene.position.set(-(box.min.x+size.x/2)*s, -box.min.y*s, -(box.min.z+size.z/2)*s);
-  for (const n of Object.keys(actions))
-    if (CLIP_TRAVEL[n]) clipSpeed[n] = CLIP_TRAVEL[n]*s / actions[n].getClip().duration;
+  /* Hips translation is in rig units (~100x the mesh units), so the
+     conversion needs the Hips' accumulated world scale, not the mesh
+     scale — using the latter made the run animation crawl. */
+  avatar.updateMatrixWorld(true);
+  let hipsScale = s * 0.01;
+  const hips = avatar.getObjectByName('mixamorig:Hips');
+  if (hips && hips.parent){ const sv=new THREE.Vector3(); hips.parent.getWorldScale(sv);
+                            if (sv.x>0) hipsScale = sv.x; }
+  for (const n of Object.keys(actions)){
+    const dur = actions[n].getClip().duration;
+    if (CLIP_TRAVEL[n] && dur>0) clipSpeed[n] = CLIP_TRAVEL[n]*hipsScale / dur;
+  }
+  if (clipSpeed.Walk) WALK = +clipSpeed.Walk.toFixed(2);
+  if (clipSpeed.Run)  RUN  = +clipSpeed.Run.toFixed(2);
   document.getElementById('status').textContent =
     `level 0 · ${faces.length} wall faces · ${lampCells.length} fixtures`;
 }
@@ -315,7 +330,7 @@ function tick(){
   const hasInput = wish.lengthSq()>0;
   if (hasInput) wish.normalize();
 
-  const running = keys['ShiftLeft']||keys['ShiftRight'];
+  const running = (keys['ShiftLeft']||keys['ShiftRight']) && hasInput;
   const target = wish.multiplyScalar(hasInput ? (running?RUN:WALK) : 0);
   const rate = (grounded ? (hasInput?ACCEL:DECEL) : AIR) * dt;
   vel.x += THREE.MathUtils.clamp(target.x-vel.x, -rate, rate);
@@ -324,8 +339,14 @@ function tick(){
 
   if (keys['Space']) jumpBufT = JUMP_BUF; else jumpBufT = Math.max(0, jumpBufT-dt);
   coyoteT = grounded ? COYOTE : Math.max(0, coyoteT-dt);
-  if (jumpBufT>0 && coyoteT>0){ vy=JUMP_V; grounded=false; coyoteT=0; jumpBufT=0; play('Jump',0.05); }
-  if (!grounded){ vy -= GRAVITY*dt; pos.y += vy*dt; if (pos.y<=0){ pos.y=0; vy=0; grounded=true; currentAction=null; } }
+  if (jumpBufT>0 && coyoteT>0 && windupT<=0 && grounded){
+    windupT = JUMP_WINDUP; coyoteT=0; jumpBufT=0; play('Jump',0.05);
+  }
+  if (windupT>0){ windupT -= dt; if (windupT<=0){ vy=JUMP_V; grounded=false; } }
+  if (!grounded){ vy -= GRAVITY*dt; pos.y += vy*dt;
+    if (pos.y<=0){ pos.y=0; vy=0; grounded=true; landT=LAND_HOLD;
+                   currentAction=null; if(actions.Land) play('Land',0.06); } }
+  if (landT>0) landT -= dt;
 
   /* light pool: only the nearest fixtures are real lights */
   const near = lampCells
@@ -345,13 +366,18 @@ function tick(){
     const speed = Math.hypot(vel.x,vel.z);
     if (speed>0.25) avatar.rotation.y = Math.atan2(vel.x,vel.z);
     if (mixer){
-      if (!grounded) play('Jump',0.05);
-      else if (speed>0.25){
-        const name = (actions.Run && speed > (WALK+RUN)*0.42) ? 'Run' : 'Walk';
+      // State comes from input: holding a key always walks (or runs with
+      // Shift), even when a wall has dropped the measured speed to zero.
+      if (windupT>0 || !grounded) play('Jump',0.05);
+      else if (landT>0 && actions.Land) play('Land',0.06);
+      else if (hasInput){
+        const name = (running && actions.Run) ? 'Run' : 'Walk';
         play(name);
-        if (clipSpeed[name]) actions[name].timeScale =
-          THREE.MathUtils.clamp(speed/clipSpeed[name], 0.55, 1.9);
-      } else if (actions.Idle) play('Idle');
+        const nom = clipSpeed[name];
+        if (nom) actions[name].timeScale =
+          THREE.MathUtils.clamp(Math.max(speed, (running?RUN:WALK)*0.35)/nom, 0.45, 2.6);
+      }
+      else if (actions.Idle) play('Idle');
       else if (actions.Walk){ if (currentAction!=='Walk') play('Walk');
                               actions.Walk.paused=true; actions.Walk.time=0; }
     }

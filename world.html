@@ -13,10 +13,35 @@
             opacity:.85; z-index:2; }
   #perf { position:fixed; bottom:14px; right:14px; color:#fff2dd; text-shadow:0 1px 3px #00000066;
           opacity:.7; z-index:2; font-variant-numeric:tabular-nums; }
+
+  #hud a{ color:#8a5a20; }
+  #tune{ position:fixed; top:14px; right:14px; z-index:3; width:238px;
+         background:#fff6e6ee; backdrop-filter:blur(8px); border:1px solid #d9c49a;
+         border-radius:12px; color:#4a3620; box-shadow:0 4px 20px #7a5a3033;
+         font-size:12px; overflow:hidden; }
+  #tune .ph{ display:flex; align-items:center; justify-content:space-between;
+             padding:8px 10px; border-bottom:1px solid #e2d0ac; }
+  #tune .pb{ padding:8px 10px 10px; max-height:70vh; overflow-y:auto; }
+  #tune.collapsed .pb{ display:none; }
+  #tune label{ display:grid; grid-template-columns:1fr 34px; align-items:center;
+               gap:2px 6px; margin-bottom:7px; }
+  #tune label span{ grid-column:1; opacity:.8; }
+  #tune output{ grid-column:2; text-align:right; font-variant-numeric:tabular-nums;
+                font-weight:600; }
+  #tune input[type=range]{ grid-column:1 / -1; width:100%; height:14px; margin:0;
+                           accent-color:#b7761f; }
+  #tune button{ font:inherit; color:#4a3620; background:#f0e2c6; cursor:pointer;
+                border:1px solid #cbb287; border-radius:6px; padding:3px 9px; }
+  #tune button:hover{ background:#e6d4b0; }
+  #tune .pact{ display:flex; gap:6px; margin-top:10px; }
+  #tune .pnote{ margin:9px 0 0; font-size:11px; line-height:1.45; opacity:.65; }
+  #tune code{ background:#efe0c2; border-radius:3px; padding:0 3px; }
+  @media (max-width:760px){ #tune{ display:none; } }
 </style>
 </head>
 <body>
-<div id="hud"><b>WASD</b> move · <b>Shift</b> run · <b>Space</b> jump · <b>F</b> dance · drag to orbit</div>
+<div id="hud"><b>WASD</b> move · <b>Shift</b> run · <b>Space</b> jump · <b>F</b> dance · <b>M</b> moonwalk · drag to orbit · <a href="index.html">← back</a></div>
+<div id="tune"></div>
 <div id="status">loading…</div>
 <div id="perf"></div>
 <script type="importmap">
@@ -321,44 +346,66 @@ async function buildWorld(){
   scatterInstanced(grassT,  sample({count:220, rMin:10, rMax:185, minDist:1.8, maxSlope:1.2, scale:[1.2,2.0]}));
 }
 
+/* ======================== tuning params ========================
+   Everything the feel depends on, in one place and exposed as sliders
+   so values can be dialled in while playing instead of by reloading.
+   walkSpeed/runSpeed are overwritten at load with the speeds measured
+   from the clips themselves — see nominalClipSpeed below. */
+const TUNE = {
+  walkSpeed:    1.45,   // u/s — set from the Walk clip's real stride
+  runSpeed:     4.90,   // u/s — set from the Run clip
+  accel:       26,      // u/s² toward target velocity on the ground
+  decel:       20,      // u/s² when input released
+  airAccel:     7,      // weak steering while airborne
+  turnRate:    13,      // rad/s the body swings toward its heading
+  gravity:     24,
+  jumpVel:      8.4,
+  jumpWindup:   0.33,   // s — the Jump clip's crouch before it leaves the ground
+  landHold:     0.40,   // s — how long the Land clip owns the pose on touchdown
+  animRate:     1.00,   // global multiplier on walk/run playback
+  camDist:      7.5,
+  camHeight:    1.70,
+  slopeDrag:    0.55,   // how much a dune face costs you
+};
+const TUNE_SPEC = [
+  ['walkSpeed','Walk speed',0.4,6,0.05],
+  ['runSpeed','Run speed',1,16,0.1],
+  ['accel','Accel',4,80,1],
+  ['decel','Decel',4,80,1],
+  ['airAccel','Air control',0,30,0.5],
+  ['turnRate','Turn rate',2,40,0.5],
+  ['gravity','Gravity',6,60,0.5],
+  ['jumpVel','Jump power',3,18,0.1],
+  ['jumpWindup','Jump windup (s)',0,1.5,0.01],
+  ['landHold','Land hold (s)',0,1.2,0.01],
+  ['animRate','Anim rate ×',0.4,2.5,0.05],
+  ['camDist','Camera dist',2,20,0.25],
+  ['camHeight','Camera height',0.5,5,0.1],
+  ['slopeDrag','Slope drag',0,1.5,0.05],
+];
+
 /* ============================ avatar ===========================
-   Clip travel distances measured from the pre-flattened Mixamo clips
-   (model units). Dividing by clip duration gives each cycle's natural
-   ground speed, so animation playback can be matched to actual velocity
-   and the feet don't skate. */
-const CLIP_TRAVEL = { Walk: 85.28, Run: 149.23 };
-let avatar, mixer, actions={}, currentAction, modelScale=1, clipSpeed={}, footBones=[];
+   Hips travel per clip, measured from the FBX before root motion was
+   flattened, in rig units. Divided by clip duration and converted to
+   world units it gives each cycle's true ground speed — which is what
+   the body speed should match so the feet plant instead of skating. */
+const CLIP_TRAVEL = { Walk: 85.28, Run: 149.23, Moonwalk: 49.83 };
+let avatar, mixer, actions={}, currentAction, modelScale=1, nominal={}, footBones=[];
+const _v = new THREE.Vector3();
 const AVATAR_URLS = ['output/minimal-scifi-sikh-animated.glb','source/minimal-scifi-sikh.glb'];
 
-/* True extents of the *posed* character.
-
-   Box3.setFromObject measures a SkinnedMesh's bind-pose geometry, which for
-   this rig is centred on the armature origin — using it to place the feet
-   lifts the model half a body height into the air. Skinning each vertex with
-   applyBoneTransform gives the actual rendered silhouette. 5.5k verts, done
-   once at load. */
 function posedExtents(root){
-  const box = new THREE.Box3();
-  const v = new THREE.Vector3();
-  let skinned = false;
+  const box = new THREE.Box3(), v = new THREE.Vector3();
   root.traverse(o=>{
     if (!o.isMesh) return;
     const attr = o.geometry.attributes.position;
-    if (o.isSkinnedMesh && o.skeleton){
-      skinned = true;
-      for (let i=0;i<attr.count;i++){
-        v.fromBufferAttribute(attr, i);
-        o.applyBoneTransform(i, v);
-        box.expandByPoint(o.localToWorld(v));
-      }
-    } else {
-      for (let i=0;i<attr.count;i++){
-        v.fromBufferAttribute(attr, i);
-        box.expandByPoint(o.localToWorld(v));
-      }
+    for (let i=0;i<attr.count;i++){
+      v.fromBufferAttribute(attr,i);
+      if (o.isSkinnedMesh && o.skeleton) o.applyBoneTransform(i,v);
+      box.expandByPoint(o.localToWorld(v));
     }
   });
-  return { box, skinned };
+  return box;
 }
 
 async function loadAvatar(){
@@ -366,43 +413,58 @@ async function loadAvatar(){
     let gltf;
     try { gltf = await loadGLB(url); } catch(e){ continue; }
     gltf.scene.traverse(o=>{ if(o.isMesh){ o.castShadow=true; o.frustumCulled=false; } });
-    avatar = new THREE.Group();
-    avatar.add(gltf.scene);
-    scene.add(avatar);
+    avatar = new THREE.Group(); avatar.add(gltf.scene); scene.add(avatar);
 
     if (gltf.animations.length){
       mixer = new THREE.AnimationMixer(avatar);
       for (const c of gltf.animations) actions[c.name] = mixer.clipAction(c);
-      if (actions.Jump){ actions.Jump.setLoop(THREE.LoopOnce); actions.Jump.clampWhenFinished = true; }
+      for (const once of ['Jump','Land']){
+        if (actions[once]){ actions[once].setLoop(THREE.LoopOnce); actions[once].clampWhenFinished = true; }
+      }
       play(actions.Idle ? 'Idle' : 'Walk');
-      // play() fades in from weight 0; force full weight so the pose below is
-      // the real one and not the bind pose.
       if (currentAction) actions[currentAction].setEffectiveWeight(1);
       mixer.update(0);
-      gltf.scene.traverse(o=>{ if (o.isBone && /Toe|Foot/i.test(o.name)) footBones.push(o); });
+      gltf.scene.traverse(o=>{ if(o.isBone && /Toe|Foot/i.test(o.name)) footBones.push(o); });
     }
 
-    // Measure in the resting pose, then scale to 1.75 units and drop the feet
-    // onto the group origin, which the controller pins to the terrain.
     avatar.updateMatrixWorld(true);
-    const { box } = posedExtents(gltf.scene);
+    const box = posedExtents(gltf.scene);
     const size = box.getSize(new THREE.Vector3());
     modelScale = 1.75 / size.y;
     gltf.scene.scale.setScalar(modelScale);
-    gltf.scene.position.set(-(box.min.x + size.x/2)*modelScale,
-                            -box.min.y*modelScale,
-                            -(box.min.z + size.z/2)*modelScale);
-    for (const name of Object.keys(actions)){
-      const c = actions[name].getClip();
-      if (CLIP_TRAVEL[name]) clipSpeed[name] = CLIP_TRAVEL[name]*modelScale / c.duration;
+    gltf.scene.position.set(-(box.min.x+size.x/2)*modelScale, -box.min.y*modelScale,
+                            -(box.min.z+size.z/2)*modelScale);
+    avatar.updateMatrixWorld(true);
+
+    /* Hips translation is authored in rig units (~100× the mesh units,
+       Mixamo exports centimetres), so converting travel to world units
+       needs the Hips' accumulated world scale — not the mesh scale.
+       Getting this wrong is what made the run animation crawl. */
+    let hipsScale = modelScale * 0.01;
+    const hips = footBones.length
+      ? avatar.getObjectByName('mixamorig:Hips')
+      : null;
+    if (hips && hips.parent){
+      hips.parent.getWorldScale(_v);
+      if (_v.x > 0) hipsScale = _v.x;
     }
+    for (const name of Object.keys(CLIP_TRAVEL)){
+      if (!actions[name]) continue;
+      const dur = actions[name].getClip().duration;
+      if (dur > 0) nominal[name] = CLIP_TRAVEL[name] * hipsScale / dur;
+    }
+    // Default the body speeds to the clips' own stride speeds.
+    if (nominal.Walk) TUNE.walkSpeed = +nominal.Walk.toFixed(2);
+    if (nominal.Run)  TUNE.runSpeed  = +nominal.Run.toFixed(2);
+
     document.getElementById('status').textContent = gltf.animations.length
-      ? `clips: ${gltf.animations.map(c=>c.name).join(' · ')}${actions.Idle?'':' — no Idle clip yet'}`
+      ? `${gltf.animations.length} clips · walk ${TUNE.walkSpeed} · run ${TUNE.runSpeed} u/s`
       : 'static avatar — run the Mixamo step to animate';
     return;
   }
   document.getElementById('status').textContent = 'avatar failed to load';
 }
+
 function play(name, fade=0.18){
   if (!mixer || !actions[name] || currentAction===name) return;
   if (currentAction) actions[currentAction].fadeOut(fade);
@@ -410,62 +472,57 @@ function play(name, fade=0.18){
   actions[name].reset().fadeIn(fade).play();
   currentAction = name;
 }
-function idlePose(t){
-  if (actions.Idle) return play('Idle');
-  if (!actions.Walk) return;
-  // Stand-in until an Idle clip exists: hold the walk cycle's neutral frame
-  // and add a slow breathing bob so the character isn't a statue.
-  if (currentAction !== 'Walk') play('Walk');
-  actions.Walk.paused = true;
-  actions.Walk.time = 0;
-  return Math.sin(t*1.6)*0.012;
-}
-
-/* =========================== controls ========================== */
-const keys={};
-addEventListener('keydown',e=>{ keys[e.code]=true; if(e.code==='Space')e.preventDefault(); if(e.code==='KeyF')dancing=!dancing; });
-addEventListener('keyup',  e=>keys[e.code]=false);
-let camYaw=0.6, camPitch=0.32, dragging=false, px=0, py=0, camDist=7.5;
-renderer.domElement.addEventListener('pointerdown',e=>{dragging=true;px=e.clientX;py=e.clientY;});
-addEventListener('pointerup',()=>dragging=false);
-addEventListener('pointermove',e=>{ if(!dragging)return;
-  camYaw-=(e.clientX-px)*0.005; camPitch=THREE.MathUtils.clamp(camPitch+(e.clientY-py)*0.005,0.06,1.15);
-  px=e.clientX;py=e.clientY; });
-addEventListener('wheel',e=>{ camDist=THREE.MathUtils.clamp(camDist+e.deltaY*0.01,3,20); },{passive:true});
 
 /* ===================== character controller =====================
-   Velocity-based rather than position-based: input sets a *target*
-   velocity, real velocity accelerates toward it, so starts and stops
-   have weight. Airborne control is deliberately weak, and coyote time
-   plus a jump buffer make jumps forgiving the way action games do. */
-const WALK_SPEED = 2.9, RUN_SPEED = 8.2;
-const ACCEL = 26, DECEL = 20, AIR_ACCEL = 7;
-const GRAVITY = 24, JUMP_V = 8.4;
+   Velocity-based: input sets a target velocity and real velocity
+   accelerates toward it, so starts and stops carry weight. The
+   animation state comes from *input*, never from measured speed —
+   otherwise slope drag or a wall dropping the speed below a threshold
+   makes the character stop walking while you're still holding the key. */
+const SOLE_GAP = 0.03;
 const COYOTE = 0.12, JUMP_BUFFER = 0.15;
-const TURN_RATE = 13;
-const SOLE_GAP = 0.03;          // toe joint sits just above the sole
-const _v = new THREE.Vector3();
 
 const pos = new THREE.Vector3(0, 0, 6);
 pos.y = groundAt(pos.x, pos.z);
-const vel = new THREE.Vector3();          // horizontal velocity (x,z); y is vertical
+const vel = new THREE.Vector3();
 let vy = 0, grounded = true, heading = Math.PI;
-let coyoteT = 0, jumpBufferT = 0, wasGrounded = true, dancing = false;
+let coyoteT = 0, jumpBufT = 0;
+let windupT = 0, landT = 0;      // >0 while the jump crouch / landing owns the pose
+let dancing = false, moonwalking = false;
+let camYaw = 0.6, camPitch = 0.32, dragging = false, px = 0, py = 0;
+
+const keys = {};
+addEventListener('keydown', e=>{
+  keys[e.code] = true;
+  if (e.code==='Space') e.preventDefault();
+  if (e.code==='KeyF') { dancing = !dancing; moonwalking = false; }
+  if (e.code==='KeyM') { moonwalking = !moonwalking; dancing = false; }
+});
+addEventListener('keyup', e=>keys[e.code]=false);
+renderer.domElement.addEventListener('pointerdown',e=>{dragging=true;px=e.clientX;py=e.clientY;});
+addEventListener('pointerup',()=>dragging=false);
+addEventListener('pointermove',e=>{ if(!dragging)return;
+  camYaw -= (e.clientX-px)*0.005;
+  camPitch = THREE.MathUtils.clamp(camPitch + (e.clientY-py)*0.005, 0.06, 1.15);
+  px=e.clientX; py=e.clientY; });
+addEventListener('wheel',e=>{ TUNE.camDist = THREE.MathUtils.clamp(TUNE.camDist + e.deltaY*0.01, 2, 20);
+                              syncPanel(); }, {passive:true});
+
 const clock = new THREE.Clock();
 let elapsed = 0, fpsT = 0, frames = 0;
-window.__world = { keys, pos, vel, THREE, get avatar(){return avatar;}, get actions(){return actions;},
-  get grounded(){return grounded;}, get clips(){return Object.keys(actions);},
-  probe(){
-    const b = new THREE.Box3().setFromObject(avatar);
-    return { posY:pos.y, ground:groundAt(pos.x,pos.z), boxMinY:b.min.y, boxMaxY:b.max.y,
-             gap:+(b.min.y-groundAt(pos.x,pos.z)).toFixed(3), modelScale, current:currentAction };
-  } };
+window.__world = { keys, pos, vel, TUNE, THREE,
+  get avatar(){return avatar;}, get state(){return currentAction;},
+  get clips(){return Object.keys(actions);},
+  step:()=>tick(),
+  probe(){ return { posY:pos.y, ground:groundAt(pos.x,pos.z), nominal,
+                    speed:+Math.hypot(vel.x,vel.z).toFixed(2), grounded,
+                    action:currentAction, windupT:+windupT.toFixed(2) }; } };
 
 function tick(){
   const dt = Math.min(clock.getDelta(), 0.05);
   elapsed += dt;
 
-  /* ---- input in camera space ---- */
+  /* ---- input, in camera space ---- */
   const fwd = new THREE.Vector3(-Math.sin(camYaw), 0, -Math.cos(camYaw));
   const right = new THREE.Vector3(-fwd.z, 0, fwd.x);
   const wish = new THREE.Vector3();
@@ -473,15 +530,16 @@ function tick(){
   if (keys['KeyS']) wish.sub(fwd);
   if (keys['KeyD']) wish.add(right);
   if (keys['KeyA']) wish.sub(right);
-  const hasInput = wish.lengthSq() > 0 && !dancing;
+  const emoting = dancing || moonwalking;
+  const hasInput = wish.lengthSq() > 0 && !emoting;
   if (hasInput) wish.normalize();
 
-  const running = keys['ShiftLeft'] || keys['ShiftRight'];
-  const targetSpeed = hasInput ? (running ? RUN_SPEED : WALK_SPEED) : 0;
+  const running = (keys['ShiftLeft'] || keys['ShiftRight']) && hasInput;
+  const targetSpeed = hasInput ? (running ? TUNE.runSpeed : TUNE.walkSpeed) : 0;
 
   /* ---- accelerate toward the wish velocity ---- */
   const target = wish.multiplyScalar(targetSpeed);
-  const rate = (grounded ? (hasInput ? ACCEL : DECEL) : AIR_ACCEL) * dt;
+  const rate = (grounded ? (hasInput ? TUNE.accel : TUNE.decel) : TUNE.airAccel) * dt;
   vel.x += THREE.MathUtils.clamp(target.x - vel.x, -rate, rate);
   vel.z += THREE.MathUtils.clamp(target.z - vel.z, -rate, rate);
 
@@ -489,104 +547,168 @@ function tick(){
   const nrm = groundNormal(pos.x, pos.z);
   if (grounded && vel.lengthSq() > 0.01){
     const uphill = -(nrm.x*vel.x + nrm.z*vel.z) / Math.max(vel.length(), 0.001);
-    const drag = 1 - THREE.MathUtils.clamp(uphill*0.55, -0.15, 0.45);
-    vel.multiplyScalar(drag);
+    vel.multiplyScalar(1 - THREE.MathUtils.clamp(uphill*TUNE.slopeDrag, -0.15, 0.45));
   }
 
   pos.x = THREE.MathUtils.clamp(pos.x + vel.x*dt, -HALF+8, HALF-8);
   pos.z = THREE.MathUtils.clamp(pos.z + vel.z*dt, -HALF+8, HALF-8);
 
-  /* ---- jump: coyote time + input buffering ---- */
-  if (keys['Space']) jumpBufferT = JUMP_BUFFER; else jumpBufferT = Math.max(0, jumpBufferT - dt);
+  /* ---- jump: buffered input, coyote time, and a windup that matches
+          the clip. The Jump clip crouches for ~0.33s before the body
+          actually leaves the ground, so the impulse waits for it. ---- */
+  if (keys['Space']) jumpBufT = JUMP_BUFFER; else jumpBufT = Math.max(0, jumpBufT - dt);
   coyoteT = grounded ? COYOTE : Math.max(0, coyoteT - dt);
-  if (jumpBufferT > 0 && coyoteT > 0){
-    vy = JUMP_V; grounded = false; coyoteT = 0; jumpBufferT = 0;
+  if (jumpBufT > 0 && coyoteT > 0 && windupT <= 0 && grounded){
+    windupT = Math.max(TUNE.jumpWindup, 1e-3);
+    jumpBufT = 0; coyoteT = 0;
     play('Jump', 0.05);
+    if (actions.Jump) actions.Jump.timeScale = 1;
+  }
+  if (windupT > 0){
+    windupT -= dt;
+    if (windupT <= 0){ vy = TUNE.jumpVel; grounded = false; }
   }
 
   /* ---- vertical integration against the rendered surface ---- */
   const ground = groundAt(pos.x, pos.z);
   if (!grounded){
-    vy -= GRAVITY*dt;
+    vy -= TUNE.gravity*dt;
     pos.y += vy*dt;
-    if (pos.y <= ground){ pos.y = ground; vy = 0; grounded = true; currentAction = null; }
+    if (pos.y <= ground){
+      pos.y = ground; vy = 0; grounded = true;
+      landT = TUNE.landHold;
+      if (actions.Land){ currentAction = null; play('Land', 0.06); }
+      else currentAction = null;
+    }
   } else {
-    // Stick to the surface while walking over dunes; step down small drops.
     if (pos.y - ground > 0.45){ grounded = false; vy = 0; }
     else pos.y = ground;
   }
-  wasGrounded = grounded;
+  if (landT > 0) landT -= dt;
 
-  /* ---- orientation + animation ---- */
+  /* ---- orientation + animation state ---- */
   let bob = 0;
   if (avatar){
     const speed = Math.hypot(vel.x, vel.z);
-    if (speed > 0.25) heading = Math.atan2(vel.x, vel.z);
+    if (hasInput) heading = Math.atan2(wish.x, wish.z);   // face input, not drift
+    else if (speed > 0.4) heading = Math.atan2(vel.x, vel.z);
     let d = heading - avatar.rotation.y;
     d = Math.atan2(Math.sin(d), Math.cos(d));
-    avatar.rotation.y += d * Math.min(1, TURN_RATE*dt);
+    avatar.rotation.y += d * Math.min(1, TUNE.turnRate*dt);
 
     if (mixer){
-      if (!grounded){
+      if (windupT > 0 || !grounded){
         play('Jump', 0.05);
+      } else if (landT > 0 && actions.Land){
+        play('Land', 0.06);
+      } else if (moonwalking && actions.Moonwalk){
+        play('Moonwalk');
       } else if (dancing && actions.Dance){
         play('Dance');
-      } else if (speed > 0.25){
-        const useRun = actions.Run && speed > (WALK_SPEED + RUN_SPEED)*0.42;
-        const name = useRun ? 'Run' : 'Walk';
+      } else if (hasInput){
+        // Input decides the state. Holding a key always walks (or runs
+        // with Shift), even if drag or a wall has killed the speed.
+        const name = (running && actions.Run) ? 'Run' : 'Walk';
         play(name);
-        // Match playback to real speed so the feet plant instead of sliding.
-        if (clipSpeed[name]) actions[name].timeScale =
-          THREE.MathUtils.clamp(speed / clipSpeed[name], 0.55, 1.9);
-      } else {
-        bob = idlePose(elapsed) || 0;
+        const nom = nominal[name];
+        if (nom) actions[name].timeScale =
+          THREE.MathUtils.clamp((Math.max(speed, targetSpeed*0.35) / nom) * TUNE.animRate, 0.45, 2.6);
+      } else if (actions.Idle){
+        play('Idle');
+      } else if (actions.Walk){
+        if (currentAction !== 'Walk') play('Walk');
+        actions.Walk.paused = true; actions.Walk.time = 0;
+        bob = Math.sin(elapsed*1.6)*0.012;
       }
     }
     avatar.position.set(pos.x, pos.y + bob, pos.z);
 
-    /* ---- foot planting ----
-       Every clip rests at a slightly different height, and the bind-pose
-       bounding box can't tell us which. Measuring the lowest foot bone after
-       the mixer has posed the skeleton pins the planted foot to the sand for
-       any clip. Only while grounded — mid-air the jump arc owns the height. */
+    /* ---- foot planting ---- */
     mixer?.update(dt);
-    if (footBones.length && grounded){
-      const model = avatar.children[0];
+    if (footBones.length && grounded && windupT <= 0){
       avatar.updateMatrixWorld(true);
       let lowest = Infinity;
       for (const b of footBones){ b.getWorldPosition(_v); if (_v.y < lowest) lowest = _v.y; }
-      if (isFinite(lowest)){
-        const err = (lowest - SOLE_GAP) - pos.y;
-        model.position.y -= err * Math.min(1, 9*dt);
-      }
+      if (isFinite(lowest))
+        avatar.children[0].position.y -= ((lowest - SOLE_GAP) - pos.y) * Math.min(1, 9*dt);
     }
   }
 
-  /* ---- camera: follow with lag, never bury in a dune ---- */
-  const cx = pos.x + Math.sin(camYaw)*Math.cos(camPitch)*camDist;
-  const cz = pos.z + Math.cos(camYaw)*Math.cos(camPitch)*camDist;
-  const cy = Math.max(pos.y + 1.7 + Math.sin(camPitch)*camDist, groundAt(cx,cz) + 1.2);
+  /* ---- camera ---- */
+  const cx = pos.x + Math.sin(camYaw)*Math.cos(camPitch)*TUNE.camDist;
+  const cz = pos.z + Math.cos(camYaw)*Math.cos(camPitch)*TUNE.camDist;
+  const cy = Math.max(pos.y + TUNE.camHeight + Math.sin(camPitch)*TUNE.camDist,
+                      groundAt(cx,cz) + 1.2);
   camera.position.lerp(new THREE.Vector3(cx, cy, cz), Math.min(1, 12*dt));
   camera.lookAt(pos.x, pos.y+1.15, pos.z);
 
-  // keep the tight shadow frustum centred on the player
   sun.position.set(pos.x-60, pos.y+46, pos.z+34);
   sun.target.position.copy(pos);
   sun.target.updateMatrixWorld();
 
   if (!avatar) mixer?.update(dt);
-  renderer.render(scene,camera);
+  renderer.render(scene, camera);
 
-  frames++; fpsT+=dt;
-  if (fpsT>=1){ document.getElementById('perf').textContent =
-    `${Math.round(frames/fpsT)} fps · ${renderer.info.render.calls} draw calls`; frames=0; fpsT=0; }
+  frames++; fpsT += dt;
+  if (fpsT >= 1){
+    document.getElementById('perf').textContent =
+      `${Math.round(frames/fpsT)} fps · ${renderer.info.render.calls} draw calls · ${currentAction||'—'}`;
+    frames = 0; fpsT = 0;
+  }
 }
 
-addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);});
+/* ========================= tuning panel ========================= */
+function buildPanel(){
+  const panel = document.getElementById('tune');
+  const rows = TUNE_SPEC.map(([key,label,min,max,step])=>`
+    <label data-k="${key}">
+      <span>${label}</span>
+      <input type="range" min="${min}" max="${max}" step="${step}" value="${TUNE[key]}" data-key="${key}">
+      <output>${TUNE[key]}</output>
+    </label>`).join('');
+  panel.innerHTML = `
+    <div class="ph"><b>Tuning</b><button id="tuneToggle">hide</button></div>
+    <div class="pb">${rows}
+      <div class="pact">
+        <button id="tuneCopy">copy values</button>
+        <button id="tuneReset">reset</button>
+      </div>
+      <p class="pnote">Defaults for walk/run come from the clips' own stride speed,
+      so the feet plant at <code>anim rate 1.0</code>.</p>
+    </div>`;
+  panel.addEventListener('input', e=>{
+    const key = e.target.dataset.key;
+    if (!key) return;
+    TUNE[key] = parseFloat(e.target.value);
+    e.target.parentElement.querySelector('output').textContent = TUNE[key];
+  });
+  document.getElementById('tuneToggle').onclick = ()=>{
+    panel.classList.toggle('collapsed');
+    document.getElementById('tuneToggle').textContent =
+      panel.classList.contains('collapsed') ? 'show' : 'hide';
+  };
+  document.getElementById('tuneCopy').onclick = async ()=>{
+    const txt = TUNE_SPEC.map(([k])=>`${k}: ${TUNE[k]}`).join('\n');
+    try { await navigator.clipboard.writeText(txt); }
+    catch(e){ /* clipboard may be blocked; the values are on screen anyway */ }
+    const b = document.getElementById('tuneCopy');
+    b.textContent = 'copied'; setTimeout(()=>b.textContent='copy values', 1200);
+  };
+  document.getElementById('tuneReset').onclick = ()=>{
+    Object.assign(TUNE, DEFAULTS);
+    if (nominal.Walk) TUNE.walkSpeed = +nominal.Walk.toFixed(2);
+    if (nominal.Run)  TUNE.runSpeed  = +nominal.Run.toFixed(2);
+    syncPanel();
+  };
+}
+function syncPanel(){
+  document.querySelectorAll('#tune input[type=range]').forEach(inp=>{
+    inp.value = TUNE[inp.dataset.key];
+    inp.parentElement.querySelector('output').textContent = TUNE[inp.dataset.key];
+  });
+}
+let DEFAULTS = null;
 
-// An exception inside the animation callback kills the loop permanently
-// (three.js re-requests the frame *after* the callback returns), so surface
-// it rather than letting the world silently freeze.
 function safeTick(){
   try { tick(); }
   catch (err){
@@ -595,10 +717,12 @@ function safeTick(){
     console.error(err);
   }
 }
-window.__world.step = () => tick();
+addEventListener('resize',()=>{ camera.aspect=innerWidth/innerHeight;
+  camera.updateProjectionMatrix(); renderer.setSize(innerWidth,innerHeight); });
+
 buildWorld()
   .then(loadAvatar)
-  .then(()=>renderer.setAnimationLoop(safeTick))
+  .then(()=>{ DEFAULTS = {...TUNE}; buildPanel(); renderer.setAnimationLoop(safeTick); })
   .catch(err=>{ document.getElementById('status').textContent = 'startup error: ' + err.message;
                 console.error(err); });
 </script>
