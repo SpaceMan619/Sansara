@@ -35,7 +35,19 @@ around a desert village.
   there is exactly one shadow-casting light with a tight frustum that follows the player, and
   there is no post-processing. It targets a comfortable 60 fps on a fanless MacBook Air.
 
-### 02 — Animation viewer (`viewer.html`)
+### 02 — Backrooms, Level 0 (`backrooms.html`)
+
+A procedurally carved office maze with 7.5 m ceilings, walked by the same rigged character.
+
+- **Layout** — a random walk with long straight runs, not a perfect maze: Level 0 should read as a
+  badly-partitioned office floor with dead ends and rooms opening into rooms, not a puzzle.
+- **Textures** — wallpaper, carpet and ceiling tiles are all drawn on a `<canvas>` at load, so the
+  page pulls down nothing but Three.js itself.
+- **Lighting** — emissive ceiling panels everywhere give the look for free, while a pool of seven
+  real point lights follows the player so only nearby fixtures cost anything. One of them buzzes.
+- **Collision** — axis-separated grid checks, so you slide along walls instead of sticking to them.
+
+### 03 — Animation viewer (`viewer.html`)
 
 A minimal page for stepping through each animation clip on the rigged character in isolation.
 

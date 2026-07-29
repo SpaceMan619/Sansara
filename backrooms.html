@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Backrooms — Level 0</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  body{ margin:0; background:#0b0a06; overflow:hidden; font:13px/1.5 system-ui,-apple-system,sans-serif; }
+  #hud{ position:fixed; top:14px; left:14px; color:#d8c98a; background:#1a170ecc; backdrop-filter:blur(6px);
+        padding:9px 14px; border-radius:10px; z-index:2; border:1px solid #3a3520; }
+  #hud b{ color:#e8d98a; }
+  #status,#perf{ position:fixed; bottom:14px; color:#bdae76; opacity:.75; z-index:2; }
+  #status{ left:14px; } #perf{ right:14px; font-variant-numeric:tabular-nums; }
+  a{ color:#e8d98a; }
+</style>
+</head>
+<body>
+<div id="hud"><b>WASD</b> move · <b>Shift</b> run · <b>Space</b> jump · drag to look · <a href="index.html">← back</a></div>
+<div id="status">loading…</div>
+<div id="perf"></div>
+<script type="importmap">
+{ "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.166.1/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.166.1/examples/jsm/"
+} }
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+
+/* ========================= layout ==========================
+   A grid maze carved by random-walk "corridors" rather than a
+   perfect maze: Level 0 should read as a badly-partitioned office
+   floor — long sightlines, dead ends, and rooms that open into
+   rooms — not a puzzle. */
+const GRID = 42, CELL = 6, WALL_H = 7.5;   // tall ceilings: the defining feature
+const HALF = GRID*CELL/2;
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+const rand = mulberry32(90210);
+
+const open = new Uint8Array(GRID*GRID);          // 1 = walkable
+const at = (x,y)=> (x<0||y<0||x>=GRID||y>=GRID) ? 0 : open[y*GRID+x];
+function carve(){
+  let x = GRID>>1, y = GRID>>1;
+  for (let i=0;i<GRID*GRID*0.11;i++){
+    open[y*GRID+x] = 1;
+    // Long straight runs, occasional turn — produces corridors, not noise.
+    if (rand() < 0.22){ const d = rand()<0.5 ? 1 : -1; if (rand()<0.5) x+=d; else y+=d; }
+    else { const run = 2 + Math.floor(rand()*5);
+           const horiz = rand()<0.5, d = rand()<0.5 ? 1 : -1;
+           for (let s=0;s<run;s++){ if (horiz) x+=d; else y+=d;
+             x=THREE.MathUtils.clamp(x,1,GRID-2); y=THREE.MathUtils.clamp(y,1,GRID-2);
+             open[y*GRID+x]=1; } }
+    x=THREE.MathUtils.clamp(x,1,GRID-2); y=THREE.MathUtils.clamp(y,1,GRID-2);
+  }
+  // Punch out a few open rooms so it isn't corridors all the way down
+  for (let r=0;r<7;r++){
+    const w=2+Math.floor(rand()*3), h=2+Math.floor(rand()*3);
+    const ox=1+Math.floor(rand()*(GRID-w-2)), oy=1+Math.floor(rand()*(GRID-h-2));
+    for(let j=0;j<h;j++) for(let i=0;i<w;i++) open[(oy+j)*GRID+ox+i]=1;
+  }
+}
+carve();
+const cellToWorld = (i)=> i*CELL - HALF + CELL/2;
+function isOpenAtWorld(x,z){
+  return at(Math.floor((x+HALF)/CELL), Math.floor((z+HALF)/CELL));
+}
+
+/* ====================== procedural textures ======================
+   Canvas-generated so the page stays self-contained: no downloads,
+   no CDN images, and the tiling is controllable. */
+function makeTexture(draw, size=256, repeat=1){
+  const c = document.createElement('canvas'); c.width = c.height = size;
+  draw(c.getContext('2d'), size);
+  const t = new THREE.CanvasTexture(c);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.repeat.set(repeat, repeat);
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.anisotropy = 4;
+  return t;
+}
+const noiseInto = (ctx,size,amount,alpha)=>{
+  const img = ctx.getImageData(0,0,size,size), d = img.data;
+  for (let i=0;i<d.length;i+=4){
+    const n = (Math.random()-0.5)*amount;
+    d[i]+=n; d[i+1]+=n; d[i+2]+=n*0.8; d[i+3]=Math.min(255,d[i+3]*alpha);
+  }
+  ctx.putImageData(img,0,0);
+};
+// Damp yellow wallpaper with faint vertical striping and stains
+const wallpaper = makeTexture((ctx,s)=>{
+  ctx.fillStyle = '#c9b458'; ctx.fillRect(0,0,s,s);
+  for (let x=0;x<s;x+=8){
+    ctx.fillStyle = (x/8)%2 ? 'rgba(190,168,80,.5)' : 'rgba(163,142,63,.35)';
+    ctx.fillRect(x,0,4,s);
+  }
+  for (let i=0;i<22;i++){                       // water stains — concentric, soft
+    const cx = Math.random()*s, cy = Math.random()*s, r = 14+Math.random()*34;
+    const g = ctx.createRadialGradient(cx,cy,r*0.15, cx,cy,r);
+    g.addColorStop(0,'rgba(126,106,44,.16)');
+    g.addColorStop(0.7,'rgba(126,106,44,.10)');
+    g.addColorStop(1,'rgba(126,106,44,0)');
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(cx,cy,r,0,Math.PI*2); ctx.fill();
+  }
+  noiseInto(ctx,s,26,1);
+}, 256, 1);
+// Flat, matted office carpet
+const carpet = makeTexture((ctx,s)=>{
+  ctx.fillStyle = '#8f7f3c'; ctx.fillRect(0,0,s,s);
+  for (let i=0;i<9000;i++){
+    ctx.fillStyle = `rgba(${110+Math.random()*50|0},${98+Math.random()*45|0},${40+Math.random()*28|0},.5)`;
+    ctx.fillRect(Math.random()*s, Math.random()*s, 2, 1);
+  }
+  noiseInto(ctx,s,18,1);
+}, 256, 1);
+// Suspended ceiling tiles with grid runners
+const ceilingTex = makeTexture((ctx,s)=>{
+  ctx.fillStyle = '#d9cf9d'; ctx.fillRect(0,0,s,s);
+  for (let i=0;i<2600;i++){
+    ctx.fillStyle = `rgba(150,143,105,${Math.random()*0.5})`;
+    ctx.fillRect(Math.random()*s, Math.random()*s, 2, 2);
+  }
+  ctx.strokeStyle = '#9d9570'; ctx.lineWidth = 4;
+  ctx.strokeRect(0,0,s,s); ctx.beginPath();
+  ctx.moveTo(s/2,0); ctx.lineTo(s/2,s); ctx.moveTo(0,s/2); ctx.lineTo(s,s/2); ctx.stroke();
+}, 256, 1);
+
+/* ========================== renderer ========================== */
+const renderer = new THREE.WebGLRenderer({ antialias:true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5));
+renderer.setSize(innerWidth, innerHeight);
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.0;
+document.body.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x1c1908);
+// Tight fog is what makes the maze feel endless — and it culls distant geometry.
+scene.fog = new THREE.FogExp2(0x1a1707, 0.030);
+const camera = new THREE.PerspectiveCamera(62, innerWidth/innerHeight, 0.05, 200);
+
+/* =========================== geometry ===========================
+   Floor and ceiling are single planes with tiled textures. Walls are
+   merged into one InstancedMesh, so the entire level is a handful of
+   draw calls no matter how many wall segments the maze has. */
+const FLOOR = GRID*CELL;
+const floorMat = new THREE.MeshStandardMaterial({ map:carpet, roughness:1 });
+floorMat.map.repeat.set(GRID*1.4, GRID*1.4);
+const floor = new THREE.Mesh(new THREE.PlaneGeometry(FLOOR,FLOOR), floorMat);
+floor.rotation.x = -Math.PI/2;
+scene.add(floor);
+
+const ceilMat = new THREE.MeshStandardMaterial({ map:ceilingTex, roughness:1 });
+ceilMat.map.repeat.set(GRID, GRID);
+const ceil = new THREE.Mesh(new THREE.PlaneGeometry(FLOOR,FLOOR), ceilMat);
+ceil.rotation.x = Math.PI/2; ceil.position.y = WALL_H;
+scene.add(ceil);
+
+const wallMat = new THREE.MeshStandardMaterial({ map:wallpaper, roughness:0.95 });
+wallMat.map.repeat.set(1, WALL_H/CELL);
+const wallGeo = new THREE.PlaneGeometry(CELL, WALL_H);
+
+// One wall face wherever an open cell meets a closed one.
+const faces = [];
+for (let y=0;y<GRID;y++) for (let x=0;x<GRID;x++){
+  if (!at(x,y)) continue;
+  const wx = cellToWorld(x), wz = cellToWorld(y);
+  if (!at(x+1,y)) faces.push([wx+CELL/2, wz, -Math.PI/2]);
+  if (!at(x-1,y)) faces.push([wx-CELL/2, wz,  Math.PI/2]);
+  if (!at(x,y+1)) faces.push([wx, wz+CELL/2, Math.PI]);
+  if (!at(x,y-1)) faces.push([wx, wz-CELL/2, 0]);
+}
+{
+  const inst = new THREE.InstancedMesh(wallGeo, wallMat, faces.length);
+  const m = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler();
+  faces.forEach(([x,z,ry],i)=>{
+    e.set(0,ry,0); q.setFromEuler(e);
+    m.compose(new THREE.Vector3(x, WALL_H/2, z), q, new THREE.Vector3(1,1,1));
+    inst.setMatrixAt(i,m);
+  });
+  inst.instanceMatrix.needsUpdate = true;
+  scene.add(inst);
+}
+
+/* ============================ lighting ==========================
+   Emissive ceiling panels give the look everywhere for free; a small
+   pool of real point lights follows the player so only nearby fixtures
+   actually cost anything. */
+const lampGeo = new THREE.PlaneGeometry(CELL*0.55, CELL*0.55);
+const lampMat = new THREE.MeshBasicMaterial({ color:0xfff3c4, fog:true });
+const lampCells = [];
+for (let y=1;y<GRID-1;y+=2) for (let x=1;x<GRID-1;x+=2){
+  if (at(x,y) && rand()<0.55) lampCells.push([cellToWorld(x), cellToWorld(y)]);
+}
+{
+  const inst = new THREE.InstancedMesh(lampGeo, lampMat, lampCells.length);
+  const m = new THREE.Matrix4(), q = new THREE.Quaternion();
+  q.setFromEuler(new THREE.Euler(Math.PI/2,0,0));
+  lampCells.forEach(([x,z],i)=>{
+    m.compose(new THREE.Vector3(x, WALL_H-0.06, z), q, new THREE.Vector3(1,1,1));
+    inst.setMatrixAt(i,m);
+  });
+  inst.instanceMatrix.needsUpdate = true;
+  scene.add(inst);
+}
+scene.add(new THREE.AmbientLight(0xbfa85a, 0.62));
+scene.add(new THREE.HemisphereLight(0xd8c98a, 0x4a4020, 0.5));
+
+const POOL = 7;
+const lampPool = [];
+for (let i=0;i<POOL;i++){
+  const l = new THREE.PointLight(0xffeeb0, 0, 17, 2);
+  scene.add(l); lampPool.push(l);
+}
+
+/* ============================ player ============================ */
+const EYE = 1.62, RADIUS = 0.42;
+const WALK = 3.0, RUN = 7.0, ACCEL = 30, DECEL = 24, AIR = 8;
+const GRAVITY = 22, JUMP_V = 7.0, COYOTE = 0.12, JUMP_BUF = 0.15;
+
+let spawn = null;
+for (let y=GRID>>1;y<GRID-1 && !spawn;y++) if (at(GRID>>1,y)) spawn=[cellToWorld(GRID>>1), cellToWorld(y)];
+const pos = new THREE.Vector3(spawn[0], 0, spawn[1]);
+const vel = new THREE.Vector3();
+let vy=0, grounded=true, coyoteT=0, jumpBufT=0;
+let yaw=0, pitch=0;
+
+/* Slide along walls instead of sticking: resolve each axis separately
+   against the grid, which is all a boxy maze needs. */
+function moveWithCollision(dx,dz){
+  const nx = pos.x + dx;
+  if (isOpenAtWorld(nx + Math.sign(dx)*RADIUS, pos.z)) pos.x = nx;
+  const nz = pos.z + dz;
+  if (isOpenAtWorld(pos.x, nz + Math.sign(dz)*RADIUS)) pos.z = nz;
+}
+
+const keys={};
+addEventListener('keydown',e=>{ keys[e.code]=true; if(e.code==='Space')e.preventDefault(); });
+addEventListener('keyup',e=>keys[e.code]=false);
+let dragging=false, px=0, py=0;
+renderer.domElement.addEventListener('pointerdown',e=>{dragging=true;px=e.clientX;py=e.clientY;});
+addEventListener('pointerup',()=>dragging=false);
+addEventListener('pointermove',e=>{ if(!dragging)return;
+  yaw -= (e.clientX-px)*0.0032;
+  pitch = THREE.MathUtils.clamp(pitch - (e.clientY-py)*0.0032, -1.2, 1.2);
+  px=e.clientX; py=e.clientY; });
+
+/* =========================== character =========================== */
+let avatar, mixer, actions={}, currentAction, footBones=[], clipSpeed={};
+const CLIP_TRAVEL = { Walk:85.28, Run:149.23 };
+const SOLE_GAP = 0.03, _v = new THREE.Vector3();
+const loader = new GLTFLoader();
+
+function play(name, fade=0.18){
+  if (!mixer || !actions[name] || currentAction===name) return;
+  if (currentAction) actions[currentAction].fadeOut(fade);
+  actions[name].paused=false;
+  actions[name].reset().fadeIn(fade).play();
+  currentAction = name;
+}
+function posedExtents(root){
+  const box = new THREE.Box3(), v = new THREE.Vector3();
+  root.traverse(o=>{
+    if (!o.isMesh) return;
+    const attr = o.geometry.attributes.position;
+    for (let i=0;i<attr.count;i++){
+      v.fromBufferAttribute(attr,i);
+      if (o.isSkinnedMesh && o.skeleton) o.applyBoneTransform(i,v);
+      box.expandByPoint(o.localToWorld(v));
+    }
+  });
+  return box;
+}
+async function loadAvatar(){
+  const gltf = await new Promise((res,rej)=>
+    loader.load('output/minimal-scifi-sikh-animated.glb', res, undefined, rej));
+  gltf.scene.traverse(o=>{ if(o.isMesh) o.frustumCulled=false; });
+  avatar = new THREE.Group(); avatar.add(gltf.scene); scene.add(avatar);
+  mixer = new THREE.AnimationMixer(avatar);
+  for (const c of gltf.animations) actions[c.name] = mixer.clipAction(c);
+  if (actions.Jump){ actions.Jump.setLoop(THREE.LoopOnce); actions.Jump.clampWhenFinished = true; }
+  play(actions.Idle ? 'Idle' : 'Walk');
+  if (currentAction) actions[currentAction].setEffectiveWeight(1);
+  mixer.update(0);
+  gltf.scene.traverse(o=>{ if(o.isBone && /Toe|Foot/i.test(o.name)) footBones.push(o); });
+
+  avatar.updateMatrixWorld(true);
+  const box = posedExtents(gltf.scene);
+  const size = box.getSize(new THREE.Vector3());
+  const s = 1.75/size.y;
+  gltf.scene.scale.setScalar(s);
+  gltf.scene.position.set(-(box.min.x+size.x/2)*s, -box.min.y*s, -(box.min.z+size.z/2)*s);
+  for (const n of Object.keys(actions))
+    if (CLIP_TRAVEL[n]) clipSpeed[n] = CLIP_TRAVEL[n]*s / actions[n].getClip().duration;
+  document.getElementById('status').textContent =
+    `level 0 · ${faces.length} wall faces · ${lampCells.length} fixtures`;
+}
+
+/* ============================= loop ============================= */
+const clock = new THREE.Clock();
+let fpsT=0, frames=0, flicker=0;
+window.__backrooms = { keys, pos, step:()=>tick() };
+
+function tick(){
+  const dt = Math.min(clock.getDelta(), 0.05);
+
+  const fwd = new THREE.Vector3(-Math.sin(yaw),0,-Math.cos(yaw));
+  const right = new THREE.Vector3(-fwd.z,0,fwd.x);
+  const wish = new THREE.Vector3();
+  if (keys['KeyW']) wish.add(fwd);
+  if (keys['KeyS']) wish.sub(fwd);
+  if (keys['KeyD']) wish.add(right);
+  if (keys['KeyA']) wish.sub(right);
+  const hasInput = wish.lengthSq()>0;
+  if (hasInput) wish.normalize();
+
+  const running = keys['ShiftLeft']||keys['ShiftRight'];
+  const target = wish.multiplyScalar(hasInput ? (running?RUN:WALK) : 0);
+  const rate = (grounded ? (hasInput?ACCEL:DECEL) : AIR) * dt;
+  vel.x += THREE.MathUtils.clamp(target.x-vel.x, -rate, rate);
+  vel.z += THREE.MathUtils.clamp(target.z-vel.z, -rate, rate);
+  moveWithCollision(vel.x*dt, vel.z*dt);
+
+  if (keys['Space']) jumpBufT = JUMP_BUF; else jumpBufT = Math.max(0, jumpBufT-dt);
+  coyoteT = grounded ? COYOTE : Math.max(0, coyoteT-dt);
+  if (jumpBufT>0 && coyoteT>0){ vy=JUMP_V; grounded=false; coyoteT=0; jumpBufT=0; play('Jump',0.05); }
+  if (!grounded){ vy -= GRAVITY*dt; pos.y += vy*dt; if (pos.y<=0){ pos.y=0; vy=0; grounded=true; currentAction=null; } }
+
+  /* light pool: only the nearest fixtures are real lights */
+  const near = lampCells
+    .map(([x,z])=>({x,z,d:(x-pos.x)**2 + (z-pos.z)**2}))
+    .sort((a,b)=>a.d-b.d).slice(0,POOL);
+  flicker += dt;
+  lampPool.forEach((l,i)=>{
+    if (i<near.length){
+      l.position.set(near[i].x, WALL_H-0.35, near[i].z);
+      // one fixture buzzes; the rest hold steady
+      const buzz = (i===2) ? (0.55 + 0.45*Math.abs(Math.sin(flicker*17.3)*Math.sin(flicker*3.1))) : 1;
+      l.intensity = 13*buzz;
+    } else l.intensity = 0;
+  });
+
+  if (avatar){
+    const speed = Math.hypot(vel.x,vel.z);
+    if (speed>0.25) avatar.rotation.y = Math.atan2(vel.x,vel.z);
+    if (mixer){
+      if (!grounded) play('Jump',0.05);
+      else if (speed>0.25){
+        const name = (actions.Run && speed > (WALK+RUN)*0.42) ? 'Run' : 'Walk';
+        play(name);
+        if (clipSpeed[name]) actions[name].timeScale =
+          THREE.MathUtils.clamp(speed/clipSpeed[name], 0.55, 1.9);
+      } else if (actions.Idle) play('Idle');
+      else if (actions.Walk){ if (currentAction!=='Walk') play('Walk');
+                              actions.Walk.paused=true; actions.Walk.time=0; }
+    }
+    avatar.position.set(pos.x, pos.y, pos.z);
+    mixer.update(dt);
+    if (footBones.length && grounded){
+      avatar.updateMatrixWorld(true);
+      let lowest = Infinity;
+      for (const b of footBones){ b.getWorldPosition(_v); if(_v.y<lowest) lowest=_v.y; }
+      if (isFinite(lowest)) avatar.children[0].position.y -= ((lowest-SOLE_GAP)-pos.y) * Math.min(1,9*dt);
+    }
+  }
+
+  // third-person camera, pulled in so corridors stay claustrophobic
+  const dist = 3.4;
+  const cx = pos.x + Math.sin(yaw)*Math.cos(pitch)*dist;
+  const cz = pos.z + Math.cos(yaw)*Math.cos(pitch)*dist;
+  const cy = pos.y + EYE + Math.sin(pitch)*dist;
+  camera.position.lerp(new THREE.Vector3(cx,cy,cz), Math.min(1,14*dt));
+  camera.lookAt(pos.x, pos.y+1.2, pos.z);
+
+  renderer.render(scene,camera);
+  frames++; fpsT+=dt;
+  if (fpsT>=1){ document.getElementById('perf').textContent =
+    `${Math.round(frames/fpsT)} fps · ${renderer.info.render.calls} draw calls`; frames=0; fpsT=0; }
+}
+function safeTick(){
+  try { tick(); }
+  catch(err){ renderer.setAnimationLoop(null);
+              document.getElementById('status').textContent='loop error: '+err.message;
+              console.error(err); }
+}
+addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);});
+loadAvatar()
+  .catch(err=>{ document.getElementById('status').textContent='avatar failed: '+err.message; })
+  .finally(()=>renderer.setAnimationLoop(safeTick));
+</script>
+</body>
+</html>
