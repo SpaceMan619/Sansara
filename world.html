@@ -15,14 +15,18 @@
           opacity:.7; z-index:2; font-variant-numeric:tabular-nums; }
 
   #hud a{ color:#8a5a20; }
-  #tune{ position:fixed; top:14px; right:14px; z-index:3; width:238px;
-         background:#fff6e6ee; backdrop-filter:blur(8px); border:1px solid #d9c49a;
-         border-radius:12px; color:#4a3620; box-shadow:0 4px 20px #7a5a3033;
-         font-size:12px; overflow:hidden; }
+  /* Hidden until the `dev` sequence is typed — keeps the shared link clean.
+     visibility (not display) so the fade can actually run. */
+  #tune{ position:fixed; top:14px; right:14px; z-index:3; width:242px;
+         background:#fff6e6f2; backdrop-filter:blur(8px); border:1px solid #d9c49a;
+         border-radius:12px; color:#4a3620; box-shadow:0 6px 26px #7a5a3038;
+         font-size:12px; overflow:hidden;
+         opacity:0; visibility:hidden; transform:translateY(-8px) scale(.985);
+         transition:opacity .3s ease, transform .3s ease, visibility .3s linear; }
+  #tune.shown{ opacity:1; visibility:visible; transform:none; }
   #tune .ph{ display:flex; align-items:center; justify-content:space-between;
              padding:8px 10px; border-bottom:1px solid #e2d0ac; }
   #tune .pb{ padding:8px 10px 10px; max-height:70vh; overflow-y:auto; }
-  #tune.collapsed .pb{ display:none; }
   #tune label{ display:grid; grid-template-columns:1fr 34px; align-items:center;
                gap:2px 6px; margin-bottom:7px; }
   #tune label span{ grid-column:1; opacity:.8; }
@@ -33,7 +37,14 @@
   #tune button{ font:inherit; color:#4a3620; background:#f0e2c6; cursor:pointer;
                 border:1px solid #cbb287; border-radius:6px; padding:3px 9px; }
   #tune button:hover{ background:#e6d4b0; }
-  #tune .pact{ display:flex; gap:6px; margin-top:10px; }
+  #tune .pact{ display:flex; gap:6px; margin-top:12px; padding-top:11px;
+               border-top:1px solid #e2d0ac; }
+  #tune #tuneCopy{ flex:1; background:#b7761f; border-color:#98601494; color:#fff8ec;
+                   font-weight:600; padding:6px 9px; }
+  #tune #tuneCopy:hover{ background:#a1681a; }
+  #tune .pcopy{ width:100%; margin-top:8px; font:11px/1.4 ui-monospace,monospace;
+                color:#4a3620; background:#fffaf0; border:1px solid #cbb287;
+                border-radius:6px; padding:6px; resize:vertical; display:none; }
   #tune .pnote{ margin:9px 0 0; font-size:11px; line-height:1.45; opacity:.65; }
   #tune code{ background:#efe0c2; border-radius:3px; padding:0 3px; }
   @media (max-width:760px){ #tune{ display:none; } }
@@ -667,14 +678,15 @@ function buildPanel(){
       <output>${TUNE[key]}</output>
     </label>`).join('');
   panel.innerHTML = `
-    <div class="ph"><b>Tuning</b><button id="tuneToggle">hide</button></div>
+    <div class="ph"><b>Tuning</b><button id="tuneToggle" title="type dev to reopen">×</button></div>
     <div class="pb">${rows}
+      <p class="pnote">Walk/run default to the clips' own stride speed, so the feet
+      plant at <code>anim rate 1.0</code>. <code>Esc</code>, <code>×</code> or <code>dev</code> closes.</p>
       <div class="pact">
-        <button id="tuneCopy">copy values</button>
+        <button id="tuneCopy">Copy to clipboard</button>
         <button id="tuneReset">reset</button>
       </div>
-      <p class="pnote">Defaults for walk/run come from the clips' own stride speed,
-      so the feet plant at <code>anim rate 1.0</code>.</p>
+      <textarea class="pcopy" id="tuneOut" rows="8" readonly></textarea>
     </div>`;
   panel.addEventListener('input', e=>{
     const key = e.target.dataset.key;
@@ -682,17 +694,21 @@ function buildPanel(){
     TUNE[key] = parseFloat(e.target.value);
     e.target.parentElement.querySelector('output').textContent = TUNE[key];
   });
-  document.getElementById('tuneToggle').onclick = ()=>{
-    panel.classList.toggle('collapsed');
-    document.getElementById('tuneToggle').textContent =
-      panel.classList.contains('collapsed') ? 'show' : 'hide';
-  };
+  document.getElementById('tuneToggle').onclick = ()=>showPanel(false);
   document.getElementById('tuneCopy').onclick = async ()=>{
-    const txt = TUNE_SPEC.map(([k])=>`${k}: ${TUNE[k]}`).join('\n');
-    try { await navigator.clipboard.writeText(txt); }
-    catch(e){ /* clipboard may be blocked; the values are on screen anyway */ }
+    const txt = tuneSnapshot();
     const b = document.getElementById('tuneCopy');
-    b.textContent = 'copied'; setTimeout(()=>b.textContent='copy values', 1200);
+    const out = document.getElementById('tuneOut');
+    let ok = false;
+    try { await navigator.clipboard.writeText(txt); ok = true; }
+    catch(e){
+      // Clipboard API can be refused; fall back to a selectable textarea so the
+      // values are still copyable by hand.
+      out.value = txt; out.style.display = 'block'; out.select();
+      try { ok = document.execCommand('copy'); } catch(_){}
+    }
+    b.textContent = ok ? 'Copied ✓' : 'Select & copy ↓';
+    setTimeout(()=>b.textContent = 'Copy to clipboard', 1600);
   };
   document.getElementById('tuneReset').onclick = ()=>{
     Object.assign(TUNE, DEFAULTS);
@@ -701,6 +717,30 @@ function buildPanel(){
     syncPanel();
   };
 }
+/* Paste-ready block: readable in chat and directly usable as new defaults. */
+function tuneSnapshot(){
+  const body = TUNE_SPEC.map(([k])=>`  ${k}: ${TUNE[k]},`).join('\n');
+  return `TUNE {\n${body}\n}`;
+}
+
+/* The panel is dev-only: typing `dev` fades it in, again fades it out. Keeps a
+   shared link clean without hiding the controls behind a build flag. */
+let panelShown = false;
+function showPanel(on){
+  panelShown = on;
+  const el = document.getElementById('tune');
+  if (el) el.classList.toggle('shown', on);
+}
+let typed = '';
+addEventListener('keydown', e=>{
+  if (e.metaKey || e.ctrlKey || e.altKey) return;
+  if (e.key === 'Escape' && panelShown){ showPanel(false); return; }
+  const k = (e.key || '').toLowerCase();
+  if (!/^[a-z]$/.test(k)) return;
+  typed = (typed + k).slice(-3);
+  if (typed === 'dev'){ showPanel(!panelShown); typed = ''; }
+});
+
 function syncPanel(){
   document.querySelectorAll('#tune input[type=range]').forEach(inp=>{
     inp.value = TUNE[inp.dataset.key];

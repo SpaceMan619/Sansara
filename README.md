@@ -34,8 +34,10 @@ around a desert village.
 - **Animation sync** — each clip's true stride speed is derived from its Hips travel and used both
   to set the body's default speed and to scale playback, so the feet plant instead of skating. The
   Jump clip crouches for 0.33 s before leaving the ground, and the impulse waits for it.
-- **Tuning panel** — sliders for every value the feel depends on (speeds, accel, gravity, jump
-  power and windup, turn rate, camera), with a copy-values button.
+- **Tuning panel** — hidden by default; type `dev` to fade it in. Sliders for every value the feel
+  depends on (speeds, accel, gravity, jump power and windup, turn rate, camera) plus a
+  **Copy to clipboard** button that emits a paste-ready `TUNE { … }` block, so a feel that works can
+  be pasted straight back in as the new defaults. `Esc`, `×` or `dev` again closes it.
 - **Grounding** — the planted foot is pinned to the sand every frame by measuring the lowest foot
   bone, which is what actually keeps a skinned character on the floor (see the pipeline notes).
 - **Performance** — the whole scene runs in ~50 draw calls: props are drawn with `InstancedMesh`,
