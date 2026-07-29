@@ -4,7 +4,9 @@ A running notebook of 3D / Three.js experiments — rigging, procedural worlds, 
 controllers, and whatever else is worth trying next. Each experiment stays in the repo so the
 progression is visible over time rather than getting overwritten.
 
-**Live experiments:** open `index.html` (or serve the folder and browse to it).
+**▶ Live: <https://spaceman619.github.io/Sansara/>** — no install, works in any browser.
+
+To run locally instead, serve the folder (the pages fetch models, so `file://` won't work):
 
 ```bash
 python3 -m http.server 8642
@@ -27,8 +29,13 @@ around a desert village.
 - **Character** — a static GLB rigged through Mixamo, with Walk / Run / Jump / Dance clips merged
   into a single game-ready GLB.
 - **Controller** — velocity based, with acceleration and friction, camera-relative input, coyote
-  time, jump buffering, slope drag, and animation playback matched to real ground speed so the
-  feet don't skate.
+  time, jump buffering and slope drag. Animation state is driven by *input*, not measured speed,
+  so holding a key always walks even when drag or a wall has killed the velocity.
+- **Animation sync** — each clip's true stride speed is derived from its Hips travel and used both
+  to set the body's default speed and to scale playback, so the feet plant instead of skating. The
+  Jump clip crouches for 0.33 s before leaving the ground, and the impulse waits for it.
+- **Tuning panel** — sliders for every value the feel depends on (speeds, accel, gravity, jump
+  power and windup, turn rate, camera), with a copy-values button.
 - **Grounding** — the planted foot is pinned to the sand every frame by measuring the lowest foot
   bone, which is what actually keeps a skinned character on the floor (see the pipeline notes).
 - **Performance** — the whole scene runs in ~50 draw calls: props are drawn with `InstancedMesh`,
@@ -64,6 +71,8 @@ animated avatar takes four steps, three of which are scripted:
 | 2. Auto-rig + download clips | Mixamo (manual) | — |
 | 3. Merge clips into one GLB | Blender (headless) | `scripts/merge_animations.py` |
 | 4. Make clips in-place | Python (no Blender) | `scripts/inplace_root_motion.py` |
+
+Eight clips ship today: `Idle`, `HappyIdle`, `Walk`, `Run`, `Jump`, `Land`, `Dance`, `Moonwalk`.
 
 Step 4 exists because Mixamo clips downloaded without "In Place" carry root motion — the Walk clip
 travels ~85 units forward over one cycle. The game drives horizontal position itself, so that

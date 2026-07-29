@@ -95,3 +95,33 @@ wraps the callback and reports failures in the HUD.
 `window.__world` exposes `pos`, `vel`, `probe()` and `step()` for inspection from the console.
 Note that `requestAnimationFrame` is throttled when the tab is in the background, so a stalled fps
 counter does not necessarily mean the loop has crashed — `step()` drives single frames by hand.
+
+## Matching animation speed to movement
+
+A clip's real ground speed is its Hips travel divided by its duration — but the Hips channel is
+authored in rig units, roughly 100x the mesh units, because Mixamo exports centimetres. Converting
+with the *mesh* scale overestimates the clip speed by ~100x, which pins `timeScale` to its floor and
+makes the run animation crawl while the body sprints.
+
+Read the conversion factor off the rig instead, so it can't drift:
+
+```js
+hips.parent.getWorldScale(v);           // accumulated armature scale
+nominal = CLIP_TRAVEL[name] * v.x / clip.duration;
+```
+
+Measured for this character: walk 1.47 u/s, run 4.86 u/s. Those become the default body speeds, so
+the feet plant at playback rate 1.0.
+
+## Animation state should follow input, not speed
+
+Choosing the clip from measured speed means slope drag, a wall, or the first frames of acceleration
+can drop below the threshold and flip the character to idle while a key is still held. Branch on the
+input vector instead, and use measured speed only for `timeScale`.
+
+## Jump timing
+
+Mixamo's Jump clip crouches before the body leaves the ground. Sampling the Hips vertical curve puts
+takeoff at 0.33 s, apex at 0.57 s. Firing the impulse on keydown desyncs the leap from the
+animation, so the impulse waits out a windup timer while the clip plays. `Hard Landing` then owns the
+pose for `landHold` seconds on touchdown.
