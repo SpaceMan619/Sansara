@@ -12,10 +12,16 @@
   #status,#perf{ position:fixed; bottom:14px; color:#bdae76; opacity:.75; z-index:2; }
   #status{ left:14px; } #perf{ right:14px; font-variant-numeric:tabular-nums; }
   a{ color:#e8d98a; }
+  /* Vignette as a DOM overlay — zero GPU cost, and it does what a
+     post-processing pass would do for the frame edge. */
+  #vig{ position:fixed; inset:0; pointer-events:none; z-index:1;
+        background:radial-gradient(ellipse at 50% 48%,
+          rgba(0,0,0,0) 46%, rgba(0,0,0,0.16) 80%, rgba(0,0,0,0.38) 100%); }
 </style>
 </head>
 <body>
 <div id="hud"><b>WASD</b> move · <b>Shift</b> run · <b>Space</b> jump · drag to look · <a href="index.html">← back</a></div>
+<div id="vig"></div>
 <div id="status">loading…</div>
 <div id="perf"></div>
 <script type="importmap">
@@ -67,17 +73,61 @@ function isOpenAtWorld(x,z){
 }
 
 /* ====================== procedural textures ======================
-   Canvas-generated so the page stays self-contained: no downloads,
-   no CDN images, and the tiling is controllable. */
-function makeTexture(draw, size=256, repeat=1){
+   Canvas-generated so the page stays self-contained. The canvases are
+   kept, not discarded, because the normal and roughness maps are derived
+   from them: without those, light has nothing to react to and no amount
+   of relighting reads as real. */
+function makeCanvas(draw, size=256){
   const c = document.createElement('canvas'); c.width = c.height = size;
   draw(c.getContext('2d'), size);
-  const t = new THREE.CanvasTexture(c);
+  return c;
+}
+function texFrom(canvas, repeat=1, srgb=true){
+  const t = new THREE.CanvasTexture(canvas);
   t.wrapS = t.wrapT = THREE.RepeatWrapping;
   t.repeat.set(repeat, repeat);
-  t.colorSpace = THREE.SRGBColorSpace;
+  if (srgb) t.colorSpace = THREE.SRGBColorSpace;
   t.anisotropy = 4;
   return t;
+}
+/* Sobel the luminance into a tangent-space normal map. Surface relief is
+   what turns a flat plane into something light can rake across. */
+function deriveNormal(src, strength=2.2){
+  const s = src.width;
+  const sd = src.getContext('2d').getImageData(0,0,s,s).data;
+  const lum = new Float32Array(s*s);
+  for (let i=0;i<s*s;i++) lum[i] = (sd[i*4]*0.299 + sd[i*4+1]*0.587 + sd[i*4+2]*0.114)/255;
+  const out = document.createElement('canvas'); out.width = out.height = s;
+  const ctx = out.getContext('2d'), img = ctx.createImageData(s,s), d = img.data;
+  const at = (x,y)=> lum[((y+s)%s)*s + ((x+s)%s)];
+  for (let y=0;y<s;y++) for (let x=0;x<s;x++){
+    const dx = (at(x-1,y-1)+2*at(x-1,y)+at(x-1,y+1)) - (at(x+1,y-1)+2*at(x+1,y)+at(x+1,y+1));
+    const dy = (at(x-1,y-1)+2*at(x,y-1)+at(x+1,y-1)) - (at(x-1,y+1)+2*at(x,y+1)+at(x+1,y+1));
+    let nx = dx*strength, ny = dy*strength, nz = 1;
+    const len = Math.hypot(nx,ny,nz);
+    const i = (y*s+x)*4;
+    d[i]   = ((nx/len)*0.5+0.5)*255;
+    d[i+1] = ((ny/len)*0.5+0.5)*255;
+    d[i+2] = ((nz/len)*0.5+0.5)*255;
+    d[i+3] = 255;
+  }
+  ctx.putImageData(img,0,0);
+  return out;
+}
+/* Bright pixels read as worn/polished, dark as matte grime — inverted
+   luminance is a serviceable roughness map for surfaces like these. */
+function deriveRoughness(src, lo=0.55, hi=1.0){
+  const s = src.width;
+  const sd = src.getContext('2d').getImageData(0,0,s,s).data;
+  const out = document.createElement('canvas'); out.width = out.height = s;
+  const ctx = out.getContext('2d'), img = ctx.createImageData(s,s), d = img.data;
+  for (let i=0;i<s*s;i++){
+    const l = (sd[i*4]*0.299 + sd[i*4+1]*0.587 + sd[i*4+2]*0.114)/255;
+    const r = (hi - (hi-lo)*l) * 255;
+    d[i*4] = d[i*4+1] = d[i*4+2] = r; d[i*4+3] = 255;
+  }
+  ctx.putImageData(img,0,0);
+  return out;
 }
 const noiseInto = (ctx,size,amount,alpha)=>{
   const img = ctx.getImageData(0,0,size,size), d = img.data;
@@ -87,35 +137,47 @@ const noiseInto = (ctx,size,amount,alpha)=>{
   }
   ctx.putImageData(img,0,0);
 };
-// Damp yellow wallpaper with faint vertical striping and stains
-const wallpaper = makeTexture((ctx,s)=>{
-  ctx.fillStyle = '#c9b458'; ctx.fillRect(0,0,s,s);
+// Damp yellow wallpaper: vertical striping, soft stains, seam relief
+const wallCanvas = makeCanvas((ctx,s)=>{
+  ctx.fillStyle = '#8e8744'; ctx.fillRect(0,0,s,s);
   for (let x=0;x<s;x+=8){
-    ctx.fillStyle = (x/8)%2 ? 'rgba(190,168,80,.5)' : 'rgba(163,142,63,.35)';
+    ctx.fillStyle = (x/8)%2 ? 'rgba(158,149,88,.22)' : 'rgba(139,130,70,.18)';
     ctx.fillRect(x,0,4,s);
   }
-  for (let i=0;i<22;i++){                       // water stains — concentric, soft
+  for (let i=0;i<22;i++){
     const cx = Math.random()*s, cy = Math.random()*s, r = 14+Math.random()*34;
     const g = ctx.createRadialGradient(cx,cy,r*0.15, cx,cy,r);
-    g.addColorStop(0,'rgba(126,106,44,.16)');
-    g.addColorStop(0.7,'rgba(126,106,44,.10)');
-    g.addColorStop(1,'rgba(126,106,44,0)');
+    g.addColorStop(0,'rgba(108,100,52,.20)');
+    g.addColorStop(0.7,'rgba(108,100,52,.12)');
+    g.addColorStop(1,'rgba(108,100,52,0)');
     ctx.fillStyle = g; ctx.beginPath(); ctx.arc(cx,cy,r,0,Math.PI*2); ctx.fill();
   }
+  // wallpaper seams every 64px give the normal map something structural
+  ctx.strokeStyle = 'rgba(133,124,65,.55)'; ctx.lineWidth = 1;
+  for (let x=0;x<s;x+=64){ ctx.beginPath(); ctx.moveTo(x+.5,0); ctx.lineTo(x+.5,s); ctx.stroke(); }
+  // skirting trim near the floor edge of the tile
+  ctx.fillStyle = 'rgba(120,110,58,.75)'; ctx.fillRect(0, s-14, s, 10);
   noiseInto(ctx,s,26,1);
-}, 256, 1);
-// Flat, matted office carpet
-const carpet = makeTexture((ctx,s)=>{
-  ctx.fillStyle = '#8f7f3c'; ctx.fillRect(0,0,s,s);
+});
+// Flat matted office carpet — dense fibre noise so it reads as pile
+const carpetCanvas = makeCanvas((ctx,s)=>{
+  ctx.fillStyle = '#74602c'; ctx.fillRect(0,0,s,s);
   for (let i=0;i<9000;i++){
-    ctx.fillStyle = `rgba(${110+Math.random()*50|0},${98+Math.random()*45|0},${40+Math.random()*28|0},.5)`;
+    ctx.fillStyle = `rgba(${104+Math.random()*44|0},${84+Math.random()*36|0},${38+Math.random()*24|0},.55)`;
     ctx.fillRect(Math.random()*s, Math.random()*s, 2, 1);
   }
+  // damp patches
+  for (let i=0;i<10;i++){
+    const cx=Math.random()*s, cy=Math.random()*s, r=18+Math.random()*40;
+    const g=ctx.createRadialGradient(cx,cy,r*0.1,cx,cy,r);
+    g.addColorStop(0,'rgba(64,52,22,.34)'); g.addColorStop(1,'rgba(64,52,22,0)');
+    ctx.fillStyle=g; ctx.beginPath(); ctx.arc(cx,cy,r,0,Math.PI*2); ctx.fill();
+  }
   noiseInto(ctx,s,18,1);
-}, 256, 1);
+});
 // Suspended ceiling tiles with grid runners
-const ceilingTex = makeTexture((ctx,s)=>{
-  ctx.fillStyle = '#d9cf9d'; ctx.fillRect(0,0,s,s);
+const ceilCanvas = makeCanvas((ctx,s)=>{
+  ctx.fillStyle = '#d4cfa5'; ctx.fillRect(0,0,s,s);
   for (let i=0;i<2600;i++){
     ctx.fillStyle = `rgba(150,143,105,${Math.random()*0.5})`;
     ctx.fillRect(Math.random()*s, Math.random()*s, 2, 2);
@@ -123,7 +185,15 @@ const ceilingTex = makeTexture((ctx,s)=>{
   ctx.strokeStyle = '#9d9570'; ctx.lineWidth = 4;
   ctx.strokeRect(0,0,s,s); ctx.beginPath();
   ctx.moveTo(s/2,0); ctx.lineTo(s/2,s); ctx.moveTo(0,s/2); ctx.lineTo(s,s/2); ctx.stroke();
-}, 256, 1);
+});
+// Soft radial alpha, used for fixture glow and ceiling light spill
+const glowCanvas = makeCanvas((ctx,s)=>{
+  const g = ctx.createRadialGradient(s/2,s/2,0, s/2,s/2,s/2);
+  g.addColorStop(0,   'rgba(255,246,214,0.95)');
+  g.addColorStop(0.35,'rgba(255,240,190,0.34)');
+  g.addColorStop(1,   'rgba(255,235,170,0)');
+  ctx.fillStyle = g; ctx.fillRect(0,0,s,s);
+}, 128);
 
 /* ========================== renderer ========================== */
 const renderer = new THREE.WebGLRenderer({ antialias:true });
@@ -131,13 +201,13 @@ renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5));
 renderer.setSize(innerWidth, innerHeight);
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.0;
+renderer.toneMappingExposure = 1.06;
 document.body.appendChild(renderer.domElement);
 
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x1c1908);
+scene.background = new THREE.Color(0x342d15);
 // Tight fog is what makes the maze feel endless — and it culls distant geometry.
-scene.fog = new THREE.FogExp2(0x1a1707, 0.030);
+scene.fog = new THREE.FogExp2(0x3b3318, 0.019);   // yellow-brown haze, never black
 const camera = new THREE.PerspectiveCamera(62, innerWidth/innerHeight, 0.05, 200);
 
 /* =========================== geometry ===========================
@@ -145,23 +215,63 @@ const camera = new THREE.PerspectiveCamera(62, innerWidth/innerHeight, 0.05, 200
    merged into one InstancedMesh, so the entire level is a handful of
    draw calls no matter how many wall segments the maze has. */
 const FLOOR = GRID*CELL;
-const floorMat = new THREE.MeshStandardMaterial({ map:carpet, roughness:1 });
-floorMat.map.repeat.set(GRID*1.4, GRID*1.4);
+
+const floorMat = new THREE.MeshStandardMaterial({
+  map: texFrom(carpetCanvas, GRID*1.4),
+  normalMap: texFrom(deriveNormal(carpetCanvas, 1.1), GRID*1.4, false),
+  roughnessMap: texFrom(deriveRoughness(carpetCanvas, 0.95, 1.0), GRID*1.4, false),
+  roughness: 1, metalness: 0,
+});
+floorMat.normalScale.set(0.30, 0.30);
 const floor = new THREE.Mesh(new THREE.PlaneGeometry(FLOOR,FLOOR), floorMat);
 floor.rotation.x = -Math.PI/2;
+floor.receiveShadow = true;
 scene.add(floor);
 
-const ceilMat = new THREE.MeshStandardMaterial({ map:ceilingTex, roughness:1 });
-ceilMat.map.repeat.set(GRID, GRID);
+const ceilMat = new THREE.MeshStandardMaterial({
+  map: texFrom(ceilCanvas, GRID),
+  normalMap: texFrom(deriveNormal(ceilCanvas, 2.6), GRID, false),
+  roughnessMap: texFrom(deriveRoughness(ceilCanvas, 0.86, 1.0), GRID, false),
+  roughness: 1, metalness: 0,
+});
 const ceil = new THREE.Mesh(new THREE.PlaneGeometry(FLOOR,FLOOR), ceilMat);
 ceil.rotation.x = Math.PI/2; ceil.position.y = WALL_H;
 scene.add(ceil);
 
-const wallMat = new THREE.MeshStandardMaterial({ map:wallpaper, roughness:0.95 });
+/* Painted drywall is not fully matte — a touch of specular response is
+   what lets the fixtures rake across it instead of flatly filling it. */
+const wallMat = new THREE.MeshStandardMaterial({
+  map: texFrom(wallCanvas, 1),
+  normalMap: texFrom(deriveNormal(wallCanvas, 1.3), 1, false),
+  roughnessMap: texFrom(deriveRoughness(wallCanvas, 0.90, 1.0), 1, false),
+  roughness: 1, metalness: 0, vertexColors: true,
+});
 wallMat.map.repeat.set(1, WALL_H/CELL);
-const wallGeo = new THREE.PlaneGeometry(CELL, WALL_H);
+wallMat.normalMap.repeat.set(1, WALL_H/CELL);
+wallMat.roughnessMap.repeat.set(1, WALL_H/CELL);
+/* Damp wallpaper is matte. Any real sheen reads as wet plastic, which is
+   what made the walls look oily — keep relief faint and roughness high. */
+wallMat.normalScale.set(0.16, 0.16);
 
-// One wall face wherever an open cell meets a closed one.
+/* Baked AO in vertex colours: dark where wall meets floor and again at
+   the ceiling join. Corner darkening is most of what AO buys you
+   perceptually, and as vertex data it costs nothing to render. */
+const wallGeo = new THREE.PlaneGeometry(CELL, WALL_H, 1, 6);
+{
+  const posA = wallGeo.attributes.position;
+  const col = new Float32Array(posA.count*3);
+  for (let i=0;i<posA.count;i++){
+    const yN = (posA.getY(i) + WALL_H/2) / WALL_H;        // 0 floor .. 1 ceiling
+    const floorAO = THREE.MathUtils.smoothstep(yN, 0.0, 0.30);        // dark at skirting
+    const ceilAO  = 1 - 0.35*THREE.MathUtils.smoothstep(yN, 0.82, 1); // slight ceiling join
+    const v = (0.72 + 0.28*floorAO) * ceilAO;
+    col[i*3] = col[i*3+1] = col[i*3+2] = v;
+  }
+  wallGeo.setAttribute('color', new THREE.BufferAttribute(col,3));
+}
+
+/* One wall face wherever an open cell meets a closed one — the whole
+   level is a single InstancedMesh regardless of maze size. */
 const faces = [];
 for (let y=0;y<GRID;y++) for (let x=0;x<GRID;x++){
   if (!at(x,y)) continue;
@@ -184,34 +294,92 @@ for (let y=0;y<GRID;y++) for (let x=0;x<GRID;x++){
 }
 
 /* ============================ lighting ==========================
-   Emissive ceiling panels give the look everywhere for free; a small
-   pool of real point lights follows the player so only nearby fixtures
-   actually cost anything. */
+   The old rig failed because a 0.62 ambient lifted every surface
+   uniformly, so nothing was ever dark. Realism here is *contrast*, not
+   brightness: crush the ambient, let the fixtures carve pools of light,
+   and let the gaps go genuinely gloomy.
+
+   Three colour decisions do most of the remaining work:
+     - fixtures are cool and faintly green, like real fluorescent tubes;
+     - the walls supply the yellow, so light and pigment aren't the same
+       hue and the frame stops reading as a colour filter;
+     - the fill is *blue*, because real shadows shift cool rather than
+       just darkening. That hue shift is a strong perceptual cue. */
+/* The reference is emphatic: the fixtures emit a *yellow* glow, and the
+   whole palette sits in one narrow band of muted yellow-green. A cool
+   light on warm walls is normal interior practice but wrong here — it
+   read as an office at night instead of Level 0. */
+const FLUORO = 0xffe6a2;
+
 const lampGeo = new THREE.PlaneGeometry(CELL*0.55, CELL*0.55);
-const lampMat = new THREE.MeshBasicMaterial({ color:0xfff3c4, fog:true });
+const lampMat = new THREE.MeshBasicMaterial({ color:0xfff2c0, fog:true, toneMapped:false });
 const lampCells = [];
 for (let y=1;y<GRID-1;y+=2) for (let x=1;x<GRID-1;x+=2){
   if (at(x,y) && rand()<0.55) lampCells.push([cellToWorld(x), cellToWorld(y)]);
 }
+let lampInst = null;
 {
-  const inst = new THREE.InstancedMesh(lampGeo, lampMat, lampCells.length);
+  lampInst = new THREE.InstancedMesh(lampGeo, lampMat, lampCells.length);
+  const m = new THREE.Matrix4(), q = new THREE.Quaternion();
+  q.setFromEuler(new THREE.Euler(Math.PI/2,0,0));
+  const white = new THREE.Color(1,1,1);
+  lampCells.forEach(([x,z],i)=>{
+    m.compose(new THREE.Vector3(x, WALL_H-0.06, z), q, new THREE.Vector3(1,1,1));
+    lampInst.setMatrixAt(i,m);
+    lampInst.setColorAt(i, white);      // per-instance, so one can flicker alone
+  });
+  lampInst.instanceMatrix.needsUpdate = true;
+  scene.add(lampInst);
+}
+
+/* Additive glow around each fixture plus spill on the ceiling: the look
+   of bloom without paying for a post-processing pass. */
+const glowTex = texFrom(glowCanvas, 1);
+const glowMat = new THREE.MeshBasicMaterial({ map:glowTex, transparent:true,
+  blending:THREE.AdditiveBlending, depthWrite:false, fog:true, toneMapped:false, opacity:0.55 });
+{
+  const g = new THREE.PlaneGeometry(CELL*2.1, CELL*2.1);
+  const inst = new THREE.InstancedMesh(g, glowMat, lampCells.length);
   const m = new THREE.Matrix4(), q = new THREE.Quaternion();
   q.setFromEuler(new THREE.Euler(Math.PI/2,0,0));
   lampCells.forEach(([x,z],i)=>{
-    m.compose(new THREE.Vector3(x, WALL_H-0.06, z), q, new THREE.Vector3(1,1,1));
+    m.compose(new THREE.Vector3(x, WALL_H-0.10, z), q, new THREE.Vector3(1,1,1));
     inst.setMatrixAt(i,m);
   });
   inst.instanceMatrix.needsUpdate = true;
   scene.add(inst);
 }
-scene.add(new THREE.AmbientLight(0xbfa85a, 0.62));
-scene.add(new THREE.HemisphereLight(0xd8c98a, 0x4a4020, 0.5));
 
+/* Bright and flat, not dark and moody: the dread comes from even
+   coverage with nowhere to hide, so the ambient stays generous. */
+scene.add(new THREE.AmbientLight(0xc4b678, 0.74));
+scene.add(new THREE.HemisphereLight(0xe0d69e, 0x6b5d29, 0.55));
+
+/* Only the nearest fixtures are real lights; the emissive panels carry
+   the look everywhere else. Tighter range than before so the pools read. */
 const POOL = 7;
 const lampPool = [];
 for (let i=0;i<POOL;i++){
-  const l = new THREE.PointLight(0xffeeb0, 0, 17, 2);
+  const l = new THREE.PointLight(FLUORO, 0, 19, 2);
   scene.add(l); lampPool.push(l);
+}
+
+/* Dust hanging in the light. Cheaper than volumetrics and it does the
+   same job of making the air feel like it has something in it. */
+let dust = null;
+{
+  const N = 700, p = new Float32Array(N*3);
+  for (let i=0;i<N;i++){
+    p[i*3]   = (Math.random()-0.5)*46;
+    p[i*3+1] = Math.random()*WALL_H;
+    p[i*3+2] = (Math.random()-0.5)*46;
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.BufferAttribute(p,3));
+  dust = new THREE.Points(g, new THREE.PointsMaterial({
+    color:0xffeec2, size:0.03, transparent:true, opacity:0.28,
+    blending:THREE.AdditiveBlending, depthWrite:false, sizeAttenuation:true, fog:true }));
+  scene.add(dust);
 }
 
 /* ============================ player ============================ */
@@ -315,6 +483,7 @@ async function loadAvatar(){
 /* ============================= loop ============================= */
 const clock = new THREE.Clock();
 let fpsT=0, frames=0, flicker=0;
+const _lampCol = new THREE.Color();
 window.__backrooms = { keys, pos, step:()=>tick() };
 
 function tick(){
@@ -348,19 +517,32 @@ function tick(){
                    currentAction=null; if(actions.Land) play('Land',0.06); } }
   if (landT>0) landT -= dt;
 
-  /* light pool: only the nearest fixtures are real lights */
+  /* Light pool follows the player; only these are real lights. The
+     buzzing fixture now dims its *panel* too — previously the light
+     flickered while the panel stayed lit, which read as fake. */
   const near = lampCells
-    .map(([x,z])=>({x,z,d:(x-pos.x)**2 + (z-pos.z)**2}))
+    .map(([x,z],idx)=>({x,z,idx,d:(x-pos.x)**2 + (z-pos.z)**2}))
     .sort((a,b)=>a.d-b.d).slice(0,POOL);
   flicker += dt;
   lampPool.forEach((l,i)=>{
     if (i<near.length){
       l.position.set(near[i].x, WALL_H-0.35, near[i].z);
-      // one fixture buzzes; the rest hold steady
-      const buzz = (i===2) ? (0.55 + 0.45*Math.abs(Math.sin(flicker*17.3)*Math.sin(flicker*3.1))) : 1;
+      const buzz = (i===2)
+        ? (0.42 + 0.58*Math.abs(Math.sin(flicker*17.3)*Math.sin(flicker*3.1)))
+        : 1;
       l.intensity = 13*buzz;
+      if (lampInst){
+        _lampCol.setScalar(0.25 + 0.75*buzz);
+        lampInst.setColorAt(near[i].idx, _lampCol);
+        if (lampInst.instanceColor) lampInst.instanceColor.needsUpdate = true;
+      }
     } else l.intensity = 0;
   });
+  // drift the dust and keep it centred on the player so 700 points cover the level
+  if (dust){
+    dust.position.set(Math.round(pos.x/46)*46, Math.sin(flicker*0.15)*0.15, Math.round(pos.z/46)*46);
+    dust.rotation.y = flicker*0.012;
+  }
 
   if (avatar){
     const speed = Math.hypot(vel.x,vel.z);
