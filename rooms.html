@@ -187,10 +187,10 @@ const ROOMS = {
     baked: false,
     spawn: [-74, 0],
     credit: 'Dreamcore Liminal Space — Sketchfab',
-    lights: { ambient: 0.35, hemi: 0.9, dir: 2.6, sky: 0xbcd8f5, ground: 0x9a8f5e },
+    lights: { ambient: 0.5, hemi: 1.15, dir: 2.9, sky: 0xcfe2f7, ground: 0xa89a63 },
     env: { wall:0xa9c6e4, panel:0xfff4dd, floor:0x8b8256, intensity:1.6 },
     fog: [0xc3d2e0, 0.0030],
-    exposure: 1.05, charScale: 1.0,
+    exposure: 1.18, charScale: 1.0,
   },
 };
 const params = new URLSearchParams(location.search);
@@ -237,9 +237,10 @@ function buildCollision(root, box){
   const PAD = 0.5;
   const minX = box.min.x - PAD, minZ = box.min.z - PAD;
   const spanX = (box.max.x - box.min.x) + PAD*2, spanZ = (box.max.z - box.min.z) + PAD*2;
-  let cell = 0.4;
-  const MAXDIM = 420;
-  cell = Math.max(cell, spanX/MAXDIM, spanZ/MAXDIM);
+  /* Finer cells on big scenes: a hillside sampled at 0.4m steps leaves the
+     character standing on a staircase. 640 is still only ~1.6MB of grid. */
+  const MAXDIM = 640;
+  let cell = Math.max(0.22, spanX/MAXDIM, spanZ/MAXDIM);
   const nx = Math.ceil(spanX/cell), nz = Math.ceil(spanZ/cell);
 
   const floorY = new Float32Array(nx*nz).fill(Infinity);
@@ -346,11 +347,27 @@ function buildCollision(root, box){
       if (!isFinite(f)) return false;
       return fromY === undefined ? true : Math.abs(f - fromY) < 0.65;   // no climbing walls
     },
+    /* Bilinear across the four surrounding cells. A single cell lookup is a
+       flat step, so on a slope the feet sink by up to cell-size × gradient —
+       visible as legs disappearing into a hillside. Interpolating follows the
+       surface instead. Falls back to the nearest valid sample near edges and
+       walls, where some neighbours have no floor at all. */
     groundAt(x,z, fallback){
-      const k = this.idx(x,z);
-      if (k<0) return fallback;
-      const f = this.floorY[k];
-      return isFinite(f) ? f : fallback;
+      const fx = (x-this.minX)/this.cell - 0.5, fz = (z-this.minZ)/this.cell - 0.5;
+      const i0 = Math.floor(fx), j0 = Math.floor(fz);
+      const tx = fx-i0, tz = fz-j0;
+      let acc = 0, wsum = 0, near = null, nearW = -1;
+      for (let dj=0; dj<2; dj++) for (let di=0; di<2; di++){
+        const i = i0+di, j = j0+dj;
+        if (i<0||j<0||i>=this.nx||j>=this.nz) continue;
+        const v = this.floorY[j*this.nx+i];
+        if (!isFinite(v)) continue;
+        const w = (di?tx:1-tx) * (dj?tz:1-tz);
+        acc += v*w; wsum += w;
+        if (w > nearW){ nearW = w; near = v; }
+      }
+      if (wsum > 0.001) return acc/wsum;
+      return near !== null ? near : fallback;
     },
     /* Spiral out from the requested spawn until a walkable cell turns up,
        so a hint that lands inside geometry still produces a valid start. */
@@ -385,7 +402,10 @@ function buildCollision(root, box){
 const CLIP_TRAVEL = { Walk: 85.28, Run: 149.23, Moonwalk: 49.83 };
 let avatar, mixer, actions={}, currentAction, nominal={}, footBones=[], blob;
 let clipGroundOffset={}, baseModelY=0, groundOffsetY=0;
-const SOLE_GAP = 0.03, _v = new THREE.Vector3();
+/* Zero: the per-clip offset is measured from actual skinned mesh vertices,
+   so the lowest vertex already lands on the ground; the old gap compensated
+   for measuring bones and now only sinks the feet. */
+const SOLE_GAP = 0.0, _v = new THREE.Vector3();
 
 function posedExtents(root){
   const box = new THREE.Box3(), v = new THREE.Vector3();

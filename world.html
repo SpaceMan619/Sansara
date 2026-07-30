@@ -549,7 +549,11 @@ function play(name, fade=0.18){
    animation state comes from *input*, never from measured speed —
    otherwise slope drag or a wall dropping the speed below a threshold
    makes the character stop walking while you're still holding the key. */
-const SOLE_GAP = 0.03;
+/* Zero: the per-clip offset is measured from actual skinned mesh vertices,
+   so the lowest vertex already lands exactly on the ground. The old gap was
+   compensating for measuring bones instead of mesh, and now just sinks the
+   feet by its own value. */
+const SOLE_GAP = 0.0;
 const COYOTE = 0.12, JUMP_BUFFER = 0.15;
 
 const pos = new THREE.Vector3(0, 0, 6);
