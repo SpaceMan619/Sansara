@@ -1,132 +1,82 @@
 # Sansara
 
-A running notebook of 3D / Three.js experiments — rigging, procedural worlds, character
-controllers, and whatever else is worth trying next. Each experiment stays in the repo so the
-progression is visible over time rather than getting overwritten.
+Sansara is a browser-based collection of small, walkable 3D realities. It is built around a simple promise: enter a place, look around, and let the atmosphere do the talking.
 
-**▶ Live: <https://spaceman619.github.io/Sansara/>** — no install, works in any browser.
+**Current release: v0.4.0 — Dreamloom**
 
-To run locally instead, serve the folder (the pages fetch models, so `file://` won't work):
+[Open the live build](https://spaceman619.github.io/Sansara/) · [Project Future](https://projectfuture.co.za)
+
+## What is here
+
+`rooms.html` is the main experience. Hold **Tab** to open the world selector, use **← / →** to move between cards, and release **Tab** to enter the selected room. Mouse selection works when the selector is opened with the pointer. **WASD** moves, **Shift** runs, **Space** jumps, and the mouse looks around after the scene has focus.
+
+The selector, loading screen, and world-to-world transition share one short blue-and-white atmosphere loop. The goal is continuity: changing realities should feel like one gesture, not a page change.
+
+### The worlds
+
+| Place | Character | Notes |
+| --- | --- | --- |
+| **Dune** | Yes | Procedural desert village built from a height-profiled terrain and modular houses. |
+| **Level 0** | Yes | Procedural yellow office maze with generated materials and localised lights. |
+| **The Lobby** | Yes | Artist-made baked scene with inferred floor and wall collision. |
+| **The Room** | Yes | Afternoon liminal room; available in the local build. |
+| **The Pool** | Yes | Cycles-baked pool room rendered mostly unlit so the bounce lighting survives. |
+| **The Hill** | Yes | Dreamcore landscape with live atmospheric lighting. |
+
+`rooms.html` hides locally restricted scenes from the hosted build while keeping them available for local development.
+
+`viewer.html` is the animation test bench. It loads the same avatar and exposes the current clips without the world controller around them.
+
+## Why the project feels the way it does
+
+- **Quiet interface:** one clear action, short copy, and transitions that do not compete with the worlds.
+- **Soft reality:** pale glass, blue-white motion, serif and script typography, and restrained contrast create a dreamlike threshold.
+- **Immediate movement:** acceleration, deceleration, jump anticipation, landing hold, camera follow, and animation playback are tuned together rather than as separate sliders.
+- **Accessible 3D:** the experience stays on the web so the first step is a link, not an engine install.
+
+## Run it locally
+
+The pages load models and modules, so serve the directory instead of opening files directly:
 
 ```bash
 python3 -m http.server 8642
 ```
 
-Then visit <http://localhost:8642/>.
+Then open <http://127.0.0.1:8642/>.
 
----
+## Development notes
 
-## Experiments
+The project is intentionally plain: static HTML, ES modules, Three.js, and a small set of scene modules in `app/rooms/`. There is no build step to hide the work.
 
-### Liminal Rooms (`rooms.html`) — the whole thing
+- `rooms.html` owns the shared controller, selector, loading states, dev mode, FPS tracker, and scene handoff.
+- `app/rooms/dune.js` and `app/rooms/level0.js` generate procedural environments.
+- `scripts/bake_lighting.py` bakes Cycles lighting into scene textures for rooms that need a fixed atmosphere.
+- `scripts/inplace_root_motion.py` removes unwanted horizontal root travel from animation exports.
+- `scripts/assemble_houses.py` builds the Dune village from modular pieces.
+- `docs/pipeline.md` records the asset and rigging pipeline.
 
-Five published rooms, one character, one page. Two are built procedurally at load
-(`app/rooms/*.js`) and three are artist-made scenes with collision inferred from their geometry.
-A sixth licensed scene is available only in the local build because its model cannot be
-redistributed. Hold **Tab** to travel.
+Type **dev** in a room to open the development panel. It exposes movement, camera, lighting, fog, exposure, asset quality, and character scale. The panel is deliberately absent from normal play.
 
-### 01 — Dune (procedural)
+## Animation
 
-A procedurally generated desert with a rigged, animated character you can walk, run and jump
-around a desert village.
+The current avatar includes `Idle`, `HappyIdle`, `Walk`, `Run`, `Jump`, `Land`, `Dance`, and `Moonwalk`. Grounding offsets are sampled from skinned vertices, jump and land inherit the calibrated grounded offset, and animation rate follows authored stride data where available.
 
-- **Terrain** — dunes built from an asymmetric height profile: a long windward climb and a short
-  steep slipface, domain-warped so the ridge lines meander. A smoothed basin flattens the ground
-  where the village sits.
-- **Character** — a static GLB rigged through Mixamo, with Walk / Run / Jump / Dance clips merged
-  into a single game-ready GLB.
-- **Controller** — velocity based, with acceleration and friction, camera-relative input, coyote
-  time, jump buffering and slope drag. Animation state is driven by *input*, not measured speed,
-  so holding a key always walks even when drag or a wall has killed the velocity.
-- **Animation sync** — each clip's true stride speed is derived from its Hips travel and used both
-  to set the body's default speed and to scale playback, so the feet plant instead of skating. The
-  Jump clip is compressed into a responsive 0.12 s anticipation before takeoff, and the impulse
-  waits for that authored crouch rather than firing under an idle pose.
-- **Tuning panel** — hidden by default; type `dev` to fade it in. Sliders for every value the feel
-  depends on (speeds, accel, gravity, jump power and windup, turn rate, camera) plus a
-  **Copy to clipboard** button that emits a paste-ready `TUNE { … }` block, so a feel that works can
-  be pasted straight back in as the new defaults. `Esc`, `×` or `dev` again closes it.
-- **Grounding** — the planted foot is pinned to the sand every frame by measuring the lowest foot
-  bone, which is what actually keeps a skinned character on the floor (see the pipeline notes).
-- **Performance** — the whole scene runs in ~50 draw calls: props are drawn with `InstancedMesh`,
-  there is exactly one shadow-casting light with a tight frustum that follows the player, and
-  there is no post-processing. It targets a comfortable 60 fps on a fanless MacBook Air.
+The next locomotion pass will use the **Universal Animation Library** from [Quaternius](https://quaternius.itch.io/universal-animation-library). Its CC0 license makes it suitable for personal, educational, and commercial work; the project will keep the source credit visible in the asset notes.
 
-### 02 — Backrooms, Level 0 (`backrooms.html`)
+## Credits and licensing
 
-A procedurally carved office maze with 7.5 m ceilings, walked by the same rigged character.
+- Environment kits: [Kenney](https://kenney.nl), CC0.
+- Backrooms VR: [carlcapu9](https://sketchfab.com/carlcapu9), CC Attribution.
+- VR Liminal Room: [abhayexe](https://sketchfab.com/3d-models/vr-liminal-room-baked-826fc238e9d443c9b801e35cc831ff14), Sketchfab Standard.
+- Pool room: [gatgat](https://sketchfab.com/3d-models/liminal-pool-room-13ab767a3b8d409a8a3cf31fff76d62b), CC Attribution.
+- Dreamcore landscape: [CatLoveCheese](https://sketchfab.com/3d-models/dreamcore-liminal-space-875b0005014d4b42bf1e9b2ff53ed4c4), CC Attribution.
+- Character mesh: [mint.gg](https://mint.gg).
+- Current animation clips: [Mixamo](https://www.mixamo.com).
+- Upcoming animation library: [Quaternius](https://quaternius.itch.io/universal-animation-library), CC0; special thanks to [Gonzalo Furnier](https://x.com/Gonzalo_Anim).
+- Landing atmosphere video: [Gasendra Jr.](https://www.youtube.com/watch?v=e1AHGiHaeJc).
 
-- **Layout** — a random walk with long straight runs, not a perfect maze: Level 0 should read as a
-  badly-partitioned office floor with dead ends and rooms opening into rooms, not a puzzle.
-- **Textures** — wallpaper, carpet and ceiling tiles are all drawn on a `<canvas>` at load, so the
-  page pulls down nothing but Three.js itself.
-- **Lighting** — emissive ceiling panels everywhere give the look for free, while a pool of seven
-  real point lights follows the player so only nearby fixtures cost anything. One of them buzzes.
-- **Collision** — axis-separated grid checks, so you slide along walls instead of sticking to them.
+Project code is MIT licensed. Third-party assets retain their own licenses.
 
-### 03 — Liminal Rooms (`rooms.html`)
+## Direction
 
-Four artist-made scenes made walkable with the same rigged character, switchable in-page.
-
-- **Baked vs lit** — pre-lit scenes are forced to unlit materials, which reproduces the artist's
-  light exactly and skips lighting math entirely. Adding real lights on top of baked light gives you
-  two sets of shadows and washes the result out. Because an unlit room ignores lights, ordinary
-  lights can be added for the character alone — no layer masking needed.
-- **Inferred collision** — none of these scenes ship collision data, so it's rasterised from the
-  triangles at load: horizontal faces become floor heights, vertical faces become blockers wherever
-  they cross knee-to-head height. Runtime cost is an array lookup, not a raycast against 350k
-  triangles.
-- **Dominant floor detection** — a histogram of surface heights picks the level covering the most
-  area, and each cell takes the surface nearest it. Taking the lowest face instead puts the player
-  at the bottom of the pool rather than on the deck around it.
-- **Grounding in baked rooms** — a baked scene can't receive a real shadow, so a soft blob under the
-  feet keeps the character from looking pasted on.
-
-Heaviest scene runs 62 fps at 8 draw calls on 346k triangles.
-
-### 04 — Animation viewer (`viewer.html`)
-
-A minimal page for stepping through each animation clip on the rigged character in isolation.
-
----
-
-## The rigging pipeline
-
-The character started as a single static mesh with no skeleton. Turning it into a game-ready
-animated avatar takes four steps, three of which are scripted:
-
-| Step | Tool | Script |
-| --- | --- | --- |
-| 1. Convert GLB → FBX | Blender (headless) | `scripts/glb_to_fbx.py` |
-| 2. Auto-rig + download clips | Mixamo (manual) | — |
-| 3. Merge clips into one GLB | Blender (headless) | `scripts/merge_animations.py` |
-| 4. Make clips in-place | Python (no Blender) | `scripts/inplace_root_motion.py` |
-
-Eight clips ship today: `Idle`, `HappyIdle`, `Walk`, `Run`, `Jump`, `Land`, `Dance`, `Moonwalk`.
-
-Step 4 exists because Mixamo clips downloaded without "In Place" carry root motion — the Walk clip
-travels ~85 units forward over one cycle. The game drives horizontal position itself, so that
-travel fights the controller. The script flattens the Hips' horizontal translation in the exported
-GLB, where the axes are unambiguous, and keeps the vertical bob.
-
-`scripts/assemble_houses.py` builds the village houses by snapping modular kit pieces together and
-rendering a preview of each, so the results can be checked without opening Blender.
-
-Full commands are in [docs/pipeline.md](docs/pipeline.md).
-
----
-
-## Credits & licensing
-
-- **Environment art** — [Kenney](https://kenney.nl) Fantasy Town Kit and Nature Kit, both CC0.
-  Original license files are kept alongside the models in `assets/`.
-- **Backrooms VR** scene by [carlcapu9](https://sketchfab.com/carlcapu9), licensed
-  **CC Attribution** — used in the Liminal Rooms experiment.
-- **Character mesh** — generated with [mint.gg](https://mint.gg).
-- **Animation clips** — [Mixamo](https://www.mixamo.com) (Adobe).
-- **Universal Animation Library** — [Quaternius](https://quaternius.itch.io/universal-animation-library),
-  with animation contributions by [Gonzalo Furnier](https://x.com/Gonzalo_Anim), released under
-  **CC0**. The library is the source for the next locomotion and action pass.
-- **Engine** — [Three.js](https://threejs.org).
-
-Code in this repository is MIT licensed. The third-party assets keep their own licenses.
+Sansara is a prototype for accessible, authored spaces first. The longer-term direction is documented outside the codebase in the local **Sansaara Future Plan** folder: a design direction, a technical path toward photoreal browser scenes, and a staged roadmap for turning the demo into a world-model playground without losing its restraint.
