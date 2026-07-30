@@ -585,7 +585,7 @@ addEventListener('wheel',e=>{ TUNE.camDist = THREE.MathUtils.clamp(TUNE.camDist 
 const clock = new THREE.Clock();
 let elapsed = 0, fpsT = 0, frames = 0;
 window.__world = { keys, pos, vel, TUNE, THREE,
-  get avatar(){return avatar;}, get state(){return currentAction;},
+  get avatar(){return avatar;}, get _actions(){return actions;}, get _mixer(){return mixer;}, get state(){return currentAction;},
   get clips(){return Object.keys(actions);},
   step:()=>tick(),
   probe(){ return { posY:pos.y, ground:groundAt(pos.x,pos.z), nominal,

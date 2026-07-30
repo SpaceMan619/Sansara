@@ -155,7 +155,7 @@ const ROOMS = {
     credit: 'Backrooms VR by carlcapu9 — CC Attribution',
     creditUrl: 'https://sketchfab.com/carlcapu9',
     fog: [0x141109, 0.030],
-    exposure: 0.62, charScale: 0.78,
+    exposure: 0.62, charScale: 0.78, camDist: 6.4,
     charLight: { sky:0xfff0c4, ground:0xb59a63, dir:0xfff4d2, amb:0.40, hemi:0.45, dirI:0.55 },
     env: { wall:0xb9a06a, panel:0xffe9b8, floor:0x6b5a34, intensity:0.95 },
   },
@@ -166,7 +166,7 @@ const ROOMS = {
     spawn: [0, 0],
     credit: 'VR Liminal Room (baked) — Sketchfab',
     fog: [0x241d12, 0.016],
-    exposure: 0.82, charScale: 0.92,
+    exposure: 0.82, charScale: 0.92, camDist: 4.6,
     charLight: { sky:0xffeec0, ground:0xa8905c, dir:0xfff2cc, amb:0.35, hemi:0.4, dirI:0.5 },
     env: { wall:0xa88f5e, panel:0xffe3ad, floor:0x54402a, intensity:1.0 },
   },
@@ -179,7 +179,7 @@ const ROOMS = {
     lights: { ambient: 0.22, hemi: 0.45, dir: 1.5, sky: 0xdff0fb, ground: 0x8fa6ad },
     env: { wall:0xcfe0e8, panel:0xffffff, floor:0x7d939c, intensity:1.5 },
     fog: [0x2d3c44, 0.010],
-    exposure: 0.95, charScale: 1.0,
+    exposure: 0.95, charScale: 1.0, camDist: 6.0,
   },
   dreamcore: {
     label: 'Dreamcore',
@@ -190,7 +190,7 @@ const ROOMS = {
     lights: { ambient: 0.5, hemi: 1.15, dir: 2.9, sky: 0xcfe2f7, ground: 0xa89a63 },
     env: { wall:0xa9c6e4, panel:0xfff4dd, floor:0x8b8256, intensity:1.6 },
     fog: [0xc3d2e0, 0.0030],
-    exposure: 1.18, charScale: 1.0,
+    exposure: 1.18, charScale: 1.0, camDist: 7.2,
   },
 };
 const params = new URLSearchParams(location.search);
@@ -200,7 +200,7 @@ let roomKey = ROOMS[params.get('room')] ? params.get('room') : 'backrooms';
 const TUNE = {
   walkSpeed: 1.47, runSpeed: 4.86, accel: 26, decel: 20, airAccel: 7, turnRate: 13,
   gravity: 24, jumpVel: 8.4, jumpWindup: 0.33, landHold: 0.40, animRate: 1.0,
-  camDist: 3.6, camHeight: 1.65, exposure: 1.0, fogDensity: 1.0, charScale: 1.0,
+  camDist: 6.2, camHeight: 1.72, exposure: 1.0, fogDensity: 1.0, charScale: 1.0,
 };
 const TUNE_SPEC = [
   ['walkSpeed','Walk speed',0.4,6,0.05], ['runSpeed','Run speed',1,16,0.1],
@@ -208,7 +208,7 @@ const TUNE_SPEC = [
   ['turnRate','Turn rate',2,40,0.5], ['gravity','Gravity',6,60,0.5],
   ['jumpVel','Jump power',3,18,0.1], ['jumpWindup','Jump windup (s)',0,1.5,0.01],
   ['landHold','Land hold (s)',0,1.2,0.01], ['animRate','Anim rate ×',0.4,2.5,0.05],
-  ['camDist','Camera dist',1.2,14,0.1], ['camHeight','Camera height',0.5,5,0.05],
+  ['camDist','Camera dist',1.5,16,0.1], ['camHeight','Camera height',0.5,5,0.05],
   ['exposure','Exposure',0.3,2.2,0.02], ['fogDensity','Fog ×',0,3,0.05],
   ['charScale','Character size',0.4,1.6,0.01],
 ];
@@ -221,7 +221,7 @@ renderer.setSize(innerWidth, innerHeight);
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 document.body.appendChild(renderer.domElement);
-const camera = new THREE.PerspectiveCamera(60, innerWidth/innerHeight, 0.04, 500);
+const camera = new THREE.PerspectiveCamera(50, innerWidth/innerHeight, 0.04, 500);
 const loader = new GLTFLoader();
 const loadGLB = url => new Promise((res,rej)=>loader.load(url,res,undefined,rej));
 
@@ -249,6 +249,7 @@ function buildCollision(root, box){
   const flats = [];                       // horizontal faces, kept for pass 2
   const hist = new Map();                 // quantised height -> area weight
   let sawUpFace = false;                  // did any face actually point upward?
+  const ceilHist = new Map();             // downward-facing faces -> ceiling height
 
   const a = new THREE.Vector3(), b = new THREE.Vector3(), c = new THREE.Vector3();
   const ab = new THREE.Vector3(), ac = new THREE.Vector3(), n = new THREE.Vector3();
@@ -287,6 +288,10 @@ function buildCollision(root, box){
            put the player on the ceiling. */
         const up = n.y > 0;
         if (up) sawUpFace = true;
+        else {
+          const q = Math.round(y0*4)/4;
+          ceilHist.set(q, (ceilHist.get(q)||0) + (cx1-cx0+1)*(cz1-cz0+1));
+        }
         /* Store the plane, not a single height. Using the triangle's minimum Y
            across its whole footprint sinks the player into sloped ground —
            a hillside triangle can span metres of drop. Evaluating the plane at
@@ -307,6 +312,13 @@ function buildCollision(root, box){
      over pool bottoms and mezzanines don't hijack the ground. */
   let mode = 0, best = -1;
   for (const [h,w] of hist) if (w > best){ best = w; mode = h; }
+  /* Dominant ceiling height, used to keep the camera indoors. Exteriors
+     have no downward-facing faces overhead, so this stays null and the
+     camera is free to rise. */
+  let ceiling = null, cBest = -1;
+  for (const [h,w] of ceilHist){
+    if (h > mode + 1.6 && w > cBest){ cBest = w; ceiling = h; }
+  }
   const bestDist = new Float32Array(nx*nz).fill(Infinity);
   for (let t=0;t<flats.length;t+=11){
     const cx0=flats[t], cx1=flats[t+1], cz0=flats[t+2], cz1=flats[t+3], up=flats[t+4];
@@ -334,7 +346,7 @@ function buildCollision(root, box){
       if (y1 > f+0.28 && y0 < f+1.55) blocked[k] = 1;
     }
   }
-  return { nx, nz, cell, minX, minZ, floorY, blocked, mode,
+  return { nx, nz, cell, minX, minZ, floorY, blocked, mode, ceiling,
     idx(x,z){
       const cx = Math.floor((x-this.minX)/this.cell), cz = Math.floor((z-this.minZ)/this.cell);
       if (cx<0||cz<0||cx>=this.nx||cz>=this.nz) return -1;
@@ -697,6 +709,7 @@ async function loadRoom(key){
   const box = new THREE.Box3().setFromObject(roomRoot);
   TUNE.exposure = DEFAULTS.exposure = cfg.exposure ?? 1.0;
   TUNE.charScale = DEFAULTS.charScale = cfg.charScale ?? 1.0;
+  TUNE.camDist = DEFAULTS.camDist = cfg.camDist ?? 6.2;
   applyCharScale();
   baseFog = cfg.fog || [0x1a1710, 0.012];
   scene.fog = new THREE.FogExp2(baseFog[0], baseFog[1]*TUNE.fogDensity);
@@ -712,13 +725,17 @@ async function loadRoom(key){
 
   if (avatar && !avatar.parent) scene.add(avatar);
   if (blob && !blob.parent) scene.add(blob);
-  camYaw = 0.6; camPitch = 0.22;
+  camYaw = 0.6; camPitch = 0.16;
   // Place the camera outright — lerping from the previous room's position
   // means the first frames of a new room are framed from nowhere.
-  camera.position.set(
-    pos.x + Math.sin(camYaw)*Math.cos(camPitch)*TUNE.camDist,
-    pos.y + TUNE.camHeight + Math.sin(camPitch)*TUNE.camDist,
-    pos.z + Math.cos(camYaw)*Math.cos(camPitch)*TUNE.camDist);
+  {
+    const snapY = (grid.ceiling !== null && grid.ceiling !== undefined)
+      ? Math.min(pos.y + TUNE.camHeight + Math.sin(camPitch)*TUNE.camDist, grid.ceiling - 0.28)
+      : pos.y + TUNE.camHeight + Math.sin(camPitch)*TUNE.camDist;
+    camera.position.set(
+      pos.x + Math.sin(camYaw)*Math.cos(camPitch)*TUNE.camDist, snapY,
+      pos.z + Math.cos(camYaw)*Math.cos(camPitch)*TUNE.camDist);
+  }
   camera.lookAt(pos.x, pos.y+1.2, pos.z);
   if (avatar) avatar.position.copy(pos);
 
@@ -763,7 +780,7 @@ renderer.domElement.addEventListener('pointerdown',e=>{dragging=true;px=e.client
 addEventListener('pointerup',()=>dragging=false);
 addEventListener('pointermove',e=>{ if(!dragging)return;
   camYaw -= (e.clientX-px)*0.005;
-  camPitch = THREE.MathUtils.clamp(camPitch + (e.clientY-py)*0.005, -0.35, 1.15);
+  camPitch = THREE.MathUtils.clamp(camPitch + (e.clientY-py)*0.005, -0.30, 0.62);
   px=e.clientX; py=e.clientY; });
 addEventListener('wheel',e=>{ TUNE.camDist = THREE.MathUtils.clamp(TUNE.camDist+e.deltaY*0.006,1.2,14);
                               syncPanel(); },{passive:true});
@@ -778,7 +795,7 @@ function moveWithCollision(dx, dz){
 const clock = new THREE.Clock();
 let elapsed = 0, fpsT = 0, frames = 0;
 window.__rooms = { keys, pos, vel, TUNE, THREE, step:()=>tick(),
-  get avatar(){return avatar;}, get offsets(){return clipGroundOffset;},
+  get avatar(){return avatar;}, get _actions(){return actions;}, get _mixer(){return mixer;}, get offsets(){return clipGroundOffset;},
   get room(){return roomKey;}, get grid(){return grid;}, get stats(){return roomStats;},
   probe(){ return { pos:{x:+pos.x.toFixed(2),y:+pos.y.toFixed(2),z:+pos.z.toFixed(2)},
                     ground:+grid.groundAt(pos.x,pos.z,0).toFixed(2), grounded,
@@ -876,7 +893,11 @@ function tick(){
   }
   const cx = pos.x + Math.sin(camYaw)*Math.cos(camPitch)*dist;
   const cz = pos.z + Math.cos(camYaw)*Math.cos(camPitch)*dist;
-  const cy = pos.y + TUNE.camHeight + Math.sin(camPitch)*dist;
+  let cy = pos.y + TUNE.camHeight + Math.sin(camPitch)*dist;
+  // Indoors the boom would otherwise rise straight through the ceiling and
+  // look down on the level from outside it.
+  if (grid.ceiling !== null && grid.ceiling !== undefined)
+    cy = Math.min(cy, grid.ceiling - 0.28);
   camera.position.lerp(new THREE.Vector3(cx,cy,cz), Math.min(1,14*dt));
   camera.lookAt(pos.x, pos.y+1.2, pos.z);
 
