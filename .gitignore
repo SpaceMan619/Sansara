@@ -11,10 +11,9 @@ docs/*-design.md
 .DS_Store
 .claude/
 
-# Downloaded scenes whose author/licence I haven't confirmed yet — not
-# published until attribution is in place. backrooms_vr.glb is committed
-# because its licence (CC-BY, carlcapu9) is known.
-assets/scenes/dreamcore_liminal_space.glb
-assets/scenes/liminal_pool_room.glb
+# CC-BY scenes are published with attribution. abhayexe's VR Liminal Room is
+# under Sketchfab's Standard licence, which allows use in a project but not
+# redistribution of the model file, so it stays local.
 assets/scenes/vr_liminal_room_baked.glb
+output/pool_baked.glb
 inspect.html

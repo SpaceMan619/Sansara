@@ -169,7 +169,7 @@ export async function build({ THREE, loadGLB }){
     }
     return out;
   }
-  function scatter(gltf, placements){
+  function scatter(gltf, placements, castShadow=false){
     if (!placements.length) return;
     const parts = [];
     gltf.scene.updateWorldMatrix(true, true);
@@ -178,7 +178,7 @@ export async function build({ THREE, loadGLB }){
       const mat = part.mat.clone();
       if (mat.map) mat.map.colorSpace = THREE.SRGBColorSpace;
       const inst = new THREE.InstancedMesh(part.geo, mat, placements.length);
-      inst.castShadow = inst.receiveShadow = true;
+      inst.castShadow = castShadow; inst.receiveShadow = true;
       const m = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler();
       placements.forEach((p,i)=>{
         e.set(0,p.ry,0); q.setFromEuler(e);
@@ -229,7 +229,7 @@ export async function build({ THREE, loadGLB }){
       occupied.push({x,z});
     }
   }
-  for (const [g,ps] of placements) scatter(g, ps);
+  for (const [g,ps] of placements) scatter(g, ps, true);   // houses cast, ground cover doesn't
 
   scatter(stall,     sample({count:7,  rMin:8,  rMax:13, minDist:4,   scale:[1.7,1.9]}));
   scatter(cart,      sample({count:4,  rMin:9,  rMax:14, minDist:4.5, scale:[1.7,1.9]}));

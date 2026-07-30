@@ -458,7 +458,7 @@ function computeClipGroundOffsets(model, baseY){
     act.paused = false; act.stop(); act.setEffectiveWeight(0);
     offs[name] = isFinite(minY) ? baseY - minY : baseY;
   }
-  for (const a of Object.values(actions)) a.setEffectiveWeight(1);
+  for (const a of Object.values(actions)){ a.stop(); a.enabled = false; a.setEffectiveWeight(0); }
   currentAction = null;
   if (saved && actions[saved]) play(saved, 0);
 
@@ -535,34 +535,58 @@ async function loadAvatar(){
   document.getElementById('status').textContent = 'avatar failed to load';
 }
 
+/* Handing over between clips.
+
+   Two things bite here. `fadeOut()` never stops an action, it only drives
+   the weight down — so an interrupted fade leaves a clip contributing
+   forever. And a LoopOnce clip with clampWhenFinished holds its last frame
+   at full weight after it ends, so it blends into everything that follows
+   unless something explicitly retires it.
+
+   Every outgoing action is therefore given a deadline, and the sweep below
+   stops it once the fade has had time to finish. */
+const fadingOut = new Map();      // action -> time it must be stopped
+
 function play(name, fade=0.18){
   if (!mixer || !actions[name] || currentAction===name) return;
   const next = actions[name];
   const prev = currentAction ? actions[currentAction] : null;
-  next.reset();
+
   next.enabled = true;
   next.setEffectiveWeight(1);
-  next.play();
-  if (prev && fade > 0){
+  next.reset().play();
+  fadingOut.delete(next);
+
+  if (prev && prev !== next){
     prev.enabled = true;
-    next.crossFadeFrom(prev, fade, false);   // proper handover, not two fades
-  } else if (prev){
-    prev.stop();
+    next.crossFadeFrom(prev, fade, false);
+    fadingOut.set(prev, performance.now() + fade*1000 + 120);
+  }
+  // Anything still lit that isn't part of this handover gets a deadline too.
+  for (const key in actions){
+    const a = actions[key];
+    if (a === next || a === prev) continue;
+    if (a.isRunning() || a.getEffectiveWeight() > 0.001){
+      if (!fadingOut.has(a)) fadingOut.set(a, performance.now() + fade*1000 + 120);
+    }
   }
   currentAction = name;
 }
 
-/* fadeOut() only drives an action's weight toward zero — it never stops it.
-   Interrupt a fade and the stale action keeps a residual weight forever, so
-   the run ends up permanently blended with a fraction of idle. It looks fine
-   on the first transition and degrades as states are switched. Sweeping the
-   finished ones costs a loop over eight actions. */
 function retireFadedActions(){
   if (!mixer) return;
+  const now = performance.now();
   for (const key in actions){
-    if (key === currentAction) continue;
     const a = actions[key];
-    if (a.isRunning() && a.getEffectiveWeight() < 0.005){ a.stop(); a.setEffectiveWeight(0); }
+    if (key === currentAction){ fadingOut.delete(a); continue; }
+    const decayed = a.getEffectiveWeight() < 0.005;
+    const expired = fadingOut.has(a) && now >= fadingOut.get(a);
+    if ((decayed || expired) && (a.isRunning() || a.enabled)){
+      a.stop();
+      a.enabled = false;
+      a.setEffectiveWeight(0);
+      fadingOut.delete(a);
+    }
   }
 }
 
@@ -674,8 +698,7 @@ function tick(){
     if (pos.y <= ground){
       pos.y = ground; vy = 0; grounded = true;
       landT = TUNE.landHold;
-      if (actions.Land){ currentAction = null; play('Land', 0.06); }
-      else currentAction = null;
+      if (actions.Land) play('Land', 0.06);
     }
   } else {
     if (pos.y - ground > 0.45){ grounded = false; vy = 0; }

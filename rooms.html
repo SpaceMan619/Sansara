@@ -27,8 +27,8 @@
   #travel{ position:fixed; inset:0; z-index:5; display:grid; place-items:center;
            opacity:0; visibility:hidden; pointer-events:none;
            background:rgba(250,248,244,.55);
-           backdrop-filter:blur(22px) saturate(130%);
-           -webkit-backdrop-filter:blur(22px) saturate(130%);
+           backdrop-filter:blur(13px) saturate(125%);
+           -webkit-backdrop-filter:blur(13px) saturate(125%);
            transition:opacity .34s cubic-bezier(.2,.7,.3,1), visibility .34s; }
   #travel.on{ opacity:1; visibility:visible; }
   #travel .rail{ display:flex; gap:14px; padding:0 24px; max-width:96vw;
@@ -45,8 +45,10 @@
   #travel .card:nth-child(1){ transition-delay:.02s } #travel .card:nth-child(2){ transition-delay:.05s }
   #travel .card:nth-child(3){ transition-delay:.08s } #travel .card:nth-child(4){ transition-delay:.11s }
   #travel .card:nth-child(5){ transition-delay:.14s } #travel .card:nth-child(6){ transition-delay:.17s }
-  .card .swatch{ position:absolute; inset:0; opacity:.9;
-                 background:linear-gradient(165deg, var(--tint) 0%, rgba(255,255,255,.25) 78%); }
+  .card .swatch{ position:absolute; inset:0; opacity:.9; background-size:cover;
+                 background-position:center;
+                 background-image:linear-gradient(165deg, var(--tint) 0%, rgba(255,255,255,.25) 78%); }
+  .card .swatch.shot{ opacity:1; background-image:var(--shot); }
   .card .veil{ position:absolute; inset:0;
                background:linear-gradient(180deg, rgba(255,255,255,0) 34%, rgba(252,250,246,.94) 100%); }
   .card .txt{ position:absolute; left:16px; right:16px; bottom:15px; display:block; }
@@ -56,9 +58,18 @@
              color:rgba(44,39,34,.6); }
   .card.here .nm::after{ content:' · here'; font:400 10.5px/1 system-ui,sans-serif;
                          letter-spacing:.16em; text-transform:uppercase; color:rgba(44,39,34,.4); }
-  .card:hover, .card.sel{ transform:translateY(-4px) scale(1.015);
-                          box-shadow:0 16px 40px rgba(60,52,44,.2);
-                          border-color:rgba(255,255,255,.95); }
+  .card:hover{ transform:translateY(-3px); box-shadow:0 14px 34px rgba(60,52,44,.18); }
+  /* Keyboard selection has to read at a glance and not be confusable with
+     hover: the card lifts further, gains a ring, and its name goes dark. */
+  .card.sel{ transform:translateY(-14px) scale(1.035);
+             box-shadow:0 22px 50px rgba(60,52,44,.26),
+                        0 0 0 2px rgba(44,39,34,.72),
+                        0 0 0 6px rgba(255,255,255,.6);
+             border-color:transparent; }
+  .card.sel .nm{ color:#14110d; }
+  .card.sel .bl{ color:rgba(44,39,34,.8); }
+  .card.sel::after{ content:''; position:absolute; left:50%; bottom:-13px; width:22px; height:2px;
+                    transform:translateX(-50%); border-radius:2px; background:rgba(44,39,34,.75); }
   .card:focus-visible{ outline:2px solid rgba(44,39,34,.6); outline-offset:3px; }
   #travel .hint{ position:absolute; bottom:34px; left:0; right:0; text-align:center;
                  font-size:10.5px; letter-spacing:.24em; text-transform:uppercase;
@@ -97,7 +108,7 @@
          transition:opacity .6s cubic-bezier(.4,0,.2,1);
          background:#fbf9f5; }
   #wipe.on{ opacity:1; }
-  #wipe i{ position:absolute; border-radius:50%; filter:blur(46px);
+  #wipe i{ position:absolute; border-radius:50%; filter:blur(26px);
            background:radial-gradient(circle at 40% 40%,
                      rgba(255,255,255,.98), rgba(247,243,236,.72) 45%, rgba(233,226,214,0) 72%);
            transform:scale(.35); opacity:0;
@@ -194,26 +205,31 @@ const ROOMS = {
   lobby: {
     label: 'the room', file: 'assets/scenes/vr_liminal_room_baked.glb',
     blurb: 'Afternoon light through a window that leads nowhere.',
-    baked: true, spawn: [0, 0],
-    credit: 'VR Liminal Room (baked) — Sketchfab',
+    baked: true, spawn: [0, 0], local: true,
+    credit: 'VR Liminal Room [Baked] by abhayexe — Sketchfab Standard',
+    creditUrl: 'https://sketchfab.com/3d-models/vr-liminal-room-baked-826fc238e9d443c9b801e35cc831ff14',
     fog: [0x241d12, 0.016], exposure: 0.82, charScale: 0.92, camDist: 4.6,
     charLight: { sky:0xffeec0, ground:0xa8905c, dir:0xfff2cc, amb:0.35, hemi:0.4, dirI:0.5 },
     env: { wall:0xa88f5e, panel:0xffe3ad, floor:0x54402a, intensity:1.0 },
   },
   pool: {
-    label: 'the pool', file: 'assets/scenes/liminal_pool_room.glb',
-    blurb: 'Tiled, chlorinated, and completely empty.',
-    baked: false, spawn: [0, 0],
-    credit: 'Liminal Pool Room — Sketchfab',
-    lights: { ambient: 0.22, hemi: 0.45, dir: 1.5, sky: 0xdff0fb, ground: 0x8fa6ad },
-    env: { wall:0xcfe0e8, panel:0xffffff, floor:0x7d939c, intensity:1.5 },
-    fog: [0x2d3c44, 0.010], exposure: 0.95, charScale: 1.0, camDist: 6.0,
+    label: 'the pool', file: 'assets/scenes/liminal_pool_room_baked.glb',
+    blurb: 'Tiled, chlorinated, and long since drained of anyone.',
+    // Path-traced in Cycles and baked into the textures: true bounce light
+    // at zero runtime cost. Rendered unlit so the bake survives intact.
+    baked: true, spawn: [-12, 0],
+    credit: 'liminal pool room by gatgat — CC Attribution',
+    creditUrl: 'https://sketchfab.com/3d-models/liminal-pool-room-13ab767a3b8d409a8a3cf31fff76d62b',
+    charLight: { sky:0xcfe0f0, ground:0x5c6a72, dir:0xdfeaf5, amb:0.30, hemi:0.42, dirI:0.45 },
+    env: { wall:0x9fb4c0, panel:0xdfeef8, floor:0x5e6d76, intensity:0.85 },
+    fog: [0x222f38, 0.010], exposure: 1.75, charScale: 1.0, camDist: 6.0,
   },
   dreamcore: {
     label: 'the hill', file: 'assets/scenes/dreamcore_liminal_space.glb',
     blurb: 'Grass to the horizon, and a path going nowhere.',
     baked: false, spawn: [-74, 0],
-    credit: 'Dreamcore Liminal Space — Sketchfab',
+    credit: 'Dreamcore liminal space by CatLoveCheese — CC Attribution',
+    creditUrl: 'https://sketchfab.com/3d-models/dreamcore-liminal-space-875b0005014d4b42bf1e9b2ff53ed4c4',
     lights: { ambient: 0.5, hemi: 1.15, dir: 2.9, sky: 0xcfe2f7, ground: 0xa89a63 },
     env: { wall:0xa9c6e4, panel:0xfff4dd, floor:0x8b8256, intensity:1.6 },
     fog: [0xc3d2e0, 0.0030], exposure: 1.18, charScale: 1.0, camDist: 7.2,
@@ -242,11 +258,12 @@ const DEFAULTS = {...TUNE};
 
 /* ========================== renderer ========================== */
 const renderer = new THREE.WebGLRenderer({ antialias:true, powerPreference:'default' });
-renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5));
+let pixelScale = Math.min(devicePixelRatio, 1.35);
+renderer.setPixelRatio(pixelScale);
 renderer.setSize(innerWidth, innerHeight);
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.shadowMap.enabled = true;
+renderer.shadowMap.enabled = false;   // switched on only by rooms that ask for it
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 document.body.appendChild(renderer.domElement);
 const camera = new THREE.PerspectiveCamera(50, innerWidth/innerHeight, 0.04, 500);
@@ -418,7 +435,7 @@ function buildCollision(root, box){
       const onMainFloor = (x,z)=>{
         const k = this.idx(x,z);
         return k>=0 && !this.blocked[k] && isFinite(this.floorY[k])
-               && Math.abs(this.floorY[k] - this.mode) < 0.6;
+               && Math.abs(this.floorY[k] - this.mode) < 0.3;
       };
       if (onMainFloor(hx,hz)) return [hx,hz];
       for (let r=1;r<Math.max(this.nx,this.nz);r++){
@@ -469,34 +486,58 @@ function applyCharScale(){
   avatar.children[0].scale.setScalar(baseCharScale * (TUNE.charScale || 1));
 }
 
+/* Handing over between clips.
+
+   Two things bite here. `fadeOut()` never stops an action, it only drives
+   the weight down — so an interrupted fade leaves a clip contributing
+   forever. And a LoopOnce clip with clampWhenFinished holds its last frame
+   at full weight after it ends, so it blends into everything that follows
+   unless something explicitly retires it.
+
+   Every outgoing action is therefore given a deadline, and the sweep below
+   stops it once the fade has had time to finish. */
+const fadingOut = new Map();      // action -> time it must be stopped
+
 function play(name, fade=0.18){
   if (!mixer || !actions[name] || currentAction===name) return;
   const next = actions[name];
   const prev = currentAction ? actions[currentAction] : null;
-  next.reset();
+
   next.enabled = true;
   next.setEffectiveWeight(1);
-  next.play();
-  if (prev && fade > 0){
+  next.reset().play();
+  fadingOut.delete(next);
+
+  if (prev && prev !== next){
     prev.enabled = true;
-    next.crossFadeFrom(prev, fade, false);   // proper handover, not two fades
-  } else if (prev){
-    prev.stop();
+    next.crossFadeFrom(prev, fade, false);
+    fadingOut.set(prev, performance.now() + fade*1000 + 120);
+  }
+  // Anything still lit that isn't part of this handover gets a deadline too.
+  for (const key in actions){
+    const a = actions[key];
+    if (a === next || a === prev) continue;
+    if (a.isRunning() || a.getEffectiveWeight() > 0.001){
+      if (!fadingOut.has(a)) fadingOut.set(a, performance.now() + fade*1000 + 120);
+    }
   }
   currentAction = name;
 }
 
-/* fadeOut() only drives an action's weight toward zero — it never stops it.
-   Interrupt a fade and the stale action keeps a residual weight forever, so
-   the run ends up permanently blended with a fraction of idle. It looks fine
-   on the first transition and degrades as states are switched. Sweeping the
-   finished ones costs a loop over eight actions. */
 function retireFadedActions(){
   if (!mixer) return;
+  const now = performance.now();
   for (const key in actions){
-    if (key === currentAction) continue;
     const a = actions[key];
-    if (a.isRunning() && a.getEffectiveWeight() < 0.005){ a.stop(); a.setEffectiveWeight(0); }
+    if (key === currentAction){ fadingOut.delete(a); continue; }
+    const decayed = a.getEffectiveWeight() < 0.005;
+    const expired = fadingOut.has(a) && now >= fadingOut.get(a);
+    if ((decayed || expired) && (a.isRunning() || a.enabled)){
+      a.stop();
+      a.enabled = false;
+      a.setEffectiveWeight(0);
+      fadingOut.delete(a);
+    }
   }
 }
 /* A baked scene can't receive a real shadow, so the character would look
@@ -554,7 +595,7 @@ function computeClipGroundOffsets(model, baseY){
     act.paused = false; act.stop(); act.setEffectiveWeight(0);
     offs[name] = isFinite(minY) ? baseY - minY : baseY;
   }
-  for (const a of Object.values(actions)) a.setEffectiveWeight(1);
+  for (const a of Object.values(actions)){ a.stop(); a.enabled = false; a.setEffectiveWeight(0); }
   currentAction = null;
   if (saved && actions[saved]) play(saved, 0);
 
@@ -775,13 +816,15 @@ async function loadRoom(key){
   }
   roomUpdate = built && built.update ? built.update : null;
   roomSun = null;
+  if (!(built && built.sun && built.sun.shadow)) renderer.shadowMap.enabled = false;
   if (built && built.sun){
     const sl = new THREE.DirectionalLight(0xffe2b0, 2.5);
     sl.castShadow = !!built.sun.shadow;
+    renderer.shadowMap.enabled = sl.castShadow;
     if (sl.castShadow){
-      sl.shadow.mapSize.set(2048,2048);
+      sl.shadow.mapSize.set(1024,1024);
       sl.shadow.camera.near = 1; sl.shadow.camera.far = 180;
-      Object.assign(sl.shadow.camera, { left:-46, right:46, top:46, bottom:-46 });
+      Object.assign(sl.shadow.camera, { left:-30, right:30, top:30, bottom:-30 });
       sl.shadow.bias = -0.0006; sl.shadow.normalBias = 0.05;
     }
     scene.add(sl); scene.add(sl.target);
@@ -844,6 +887,7 @@ async function loadRoom(key){
   buildHud();
   flashHud();
   setProgress(1, 'here');
+  requestAnimationFrame(()=>{ try { captureThumb(key); } catch(e){} });
   setTimeout(hideLoader, 260);
 }
 let roomStats = '';
@@ -885,7 +929,7 @@ function moveWithCollision(dx, dz){
 }
 
 const clock = new THREE.Clock();
-let elapsed = 0, fpsT = 0, frames = 0;
+let elapsed = 0, fpsT = 0, frames = 0, frameAvg = 0.016, resTimer = 0;
 window.__rooms = { keys, pos, vel, TUNE, THREE, step:()=>tick(),
   get avatar(){return avatar;}, get _actions(){return actions;}, get _mixer(){return mixer;}, get offsets(){return clipGroundOffset;},
   get room(){return roomKey;}, get grid(){return grid;}, get stats(){return roomStats;},
@@ -928,7 +972,7 @@ function tick(){
   if (!grounded){
     vy -= TUNE.gravity*dt; pos.y += vy*dt;
     if (pos.y <= ground){ pos.y = ground; vy = 0; grounded = true; landT = TUNE.landHold;
-                          currentAction = null; if (actions.Land) play('Land',0.06); }
+                          if (actions.Land) play('Land',0.06); }
   } else {
     if (pos.y - ground > 0.45){ grounded = false; vy = 0; } else pos.y = ground;
   }
@@ -1004,10 +1048,26 @@ function tick(){
   if (scene.fog) scene.fog.density = baseFog[1]*TUNE.fogDensity;
 
   renderer.render(scene, camera);
+
+  /* Dynamic resolution: hold the frame budget and spend whatever pixels are
+     left. A fanless laptop throttles rather than dropping a fixed amount, so
+     a static pixel ratio either wastes headroom or falls off a cliff. */
+  frameAvg += (dt - frameAvg) * 0.05;
+  resTimer += dt;
+  if (resTimer > 0.9){
+    resTimer = 0;
+    const target = Math.min(devicePixelRatio, 1.35);
+    if (frameAvg > 0.0215 && pixelScale > 0.75){
+      pixelScale = Math.max(0.75, pixelScale - 0.15); renderer.setPixelRatio(pixelScale);
+    } else if (frameAvg < 0.0145 && pixelScale < target){
+      pixelScale = Math.min(target, pixelScale + 0.1); renderer.setPixelRatio(pixelScale);
+    }
+  }
+
   frames++; fpsT += dt;
   if (fpsT>=1){
     document.getElementById('perf').textContent =
-      `${Math.round(frames/fpsT)} fps · ${renderer.info.render.calls} calls`;
+      `${Math.round(frames/fpsT)} fps · ${renderer.info.render.calls} calls · ${pixelScale.toFixed(2)}x`;
     frames=0; fpsT=0;
   }
 }
@@ -1094,12 +1154,66 @@ function flashHud(ms = 4200){
   hudTimer = setTimeout(()=>hud.classList.remove('show'), ms);
 }
 
+/* Room thumbnails.
+
+   Rendered from the room itself the moment it finishes loading, with the
+   character hidden so the card shows the place rather than the player.
+   Cached in localStorage, so a room you've visited keeps its picture and the
+   cards stop being coloured rectangles. */
+const THUMB_KEY = 'sansara.thumbs.v1';
+let thumbs = {};
+try { thumbs = JSON.parse(localStorage.getItem(THUMB_KEY) || '{}'); } catch(e){ thumbs = {}; }
+
+function captureThumb(key){
+  if (!scene || !roomRoot) return;
+  const wasVisible = avatar ? avatar.visible : false;
+  const blobVisible = blob ? blob.visible : false;
+  if (avatar) avatar.visible = false;
+  if (blob) blob.visible = false;
+
+  const prevRatio = renderer.getPixelRatio();
+  const shotCam = camera.clone();
+  shotCam.fov = 58; shotCam.aspect = 186/238; shotCam.updateProjectionMatrix();
+  // Frame the room from just behind and above where the player starts.
+  shotCam.position.set(pos.x + Math.sin(camYaw)*3.4, pos.y + 2.1, pos.z + Math.cos(camYaw)*3.4);
+  shotCam.lookAt(pos.x - Math.sin(camYaw)*8, pos.y + 1.1, pos.z - Math.cos(camYaw)*8);
+
+  const rt = new THREE.WebGLRenderTarget(372, 476, { colorSpace: THREE.SRGBColorSpace });
+  renderer.setRenderTarget(rt);
+  renderer.render(scene, shotCam);
+  renderer.setRenderTarget(null);
+
+  const buf = new Uint8Array(372*476*4);
+  renderer.readRenderTargetPixels(rt, 0, 0, 372, 476, buf);
+  const cv = document.createElement('canvas'); cv.width = 372; cv.height = 476;
+  const ctx = cv.getContext('2d');
+  const img = ctx.createImageData(372, 476);
+  // readRenderTargetPixels hands back bottom-up rows
+  for (let y=0;y<476;y++){
+    const src = (475-y)*372*4, dst = y*372*4;
+    img.data.set(buf.subarray(src, src+372*4), dst);
+  }
+  ctx.putImageData(img,0,0);
+  rt.dispose();
+  renderer.setPixelRatio(prevRatio);
+  if (avatar) avatar.visible = wasVisible;
+  if (blob) blob.visible = blobVisible;
+
+  try {
+    thumbs[key] = cv.toDataURL('image/jpeg', 0.62);
+    localStorage.setItem(THUMB_KEY, JSON.stringify(thumbs));
+  } catch(e){ /* quota or tainted canvas: cards fall back to their tint */ }
+}
+
 /* ============================ travel ===========================
    Rooms aren't a menu of files, they're places. Holding Tab lifts you out:
    the world goes behind glass and the other places present themselves.
    Arrows or the mouse choose, releasing Tab commits. Clicking a card works
    too, for anyone who'd rather not hold a key down. */
-const roomKeys = ()=>Object.keys(ROOMS);
+/* One scene is licensed for use but not for redistribution, so it's absent
+   from the published build and present when running locally. */
+const IS_LOCAL = ['localhost','127.0.0.1',''].includes(location.hostname);
+const roomKeys = ()=>Object.keys(ROOMS).filter(k=>IS_LOCAL || !ROOMS[k].local);
 let travelOpen = false, travelIdx = 0, switching = false;
 
 function tintFor(k){
@@ -1117,7 +1231,9 @@ function buildTravel(){
     const el = document.createElement('button');
     el.className = 'card' + (k===roomKey ? ' here' : '') + (i===travelIdx ? ' sel' : '');
     el.style.setProperty('--tint', cfg.tint || tintFor(k));
-    el.innerHTML = `<span class="swatch"></span><span class="veil"></span>
+    const shot = thumbs[k];
+    el.innerHTML = `<span class="swatch${shot?' shot':''}"${shot?` style="--shot:url(${shot})"`:''}></span>
+      <span class="veil"></span>
       <span class="txt"><span class="nm">${cfg.label}</span>
       <span class="bl">${cfg.blurb || ''}</span></span>`;
     el.onclick = ()=>{ closeTravel(); goTo(k); };
