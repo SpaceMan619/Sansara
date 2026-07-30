@@ -12,18 +12,79 @@
         padding:8px 10px; border-radius:11px; flex-wrap:wrap; max-width:min(92vw,860px); }
   #hud .keys{ opacity:.75; } #hud b{ color:#e8c98a; }
   #hud a{ color:#e8c98a; text-decoration:none; border-bottom:1px solid #e8c98a66; }
-  .roomBtn{ font:inherit; color:#e8e4d8; background:#2a251c; border:1px solid #4a4335;
-            border-radius:7px; padding:4px 10px; cursor:pointer; }
-  .roomBtn:hover{ background:#38311f; }
-  .roomBtn.active{ background:#b7761f; border-color:#b7761f; color:#fff8ec; font-weight:600; }
-  #credit{ position:fixed; bottom:12px; left:12px; z-index:4; opacity:.7; font-size:11.5px;
-           max-width:60vw; }
+  /* ---- Room dock ------------------------------------------------
+     Each room is a pane of glass in a single frosted bar. The active
+     room's pane is the clear one — you're looking *through* it into that
+     space, while the others stay fogged. Frosted = closed, clear = open,
+     so the state is carried by the material rather than by a colour chip. */
+  #dock{ position:fixed; left:50%; bottom:26px; transform:translateX(-50%); z-index:4;
+         display:flex; align-items:stretch; isolation:isolate;
+         border-radius:999px; overflow:hidden;
+         background:rgba(255,253,250,.34);
+         backdrop-filter:blur(26px) saturate(150%);
+         -webkit-backdrop-filter:blur(26px) saturate(150%);
+         border:1px solid rgba(255,255,255,.55);
+         box-shadow:0 1px 0 rgba(255,255,255,.7) inset,
+                    0 10px 40px rgba(60,52,44,.22),
+                    0 2px 8px rgba(60,52,44,.12); }
+  .roomBtn{ position:relative; font:inherit; font-size:12.5px; letter-spacing:.055em;
+            color:rgba(44,39,34,.5); background:transparent; border:0;
+            padding:12px 22px; cursor:pointer; text-transform:lowercase; white-space:nowrap;
+            transition:color .45s ease, background .45s ease, letter-spacing .45s ease; }
+  .roomBtn + .roomBtn::before{ content:''; position:absolute; left:0; top:22%; bottom:22%;
+            width:1px; background:rgba(255,255,255,.6); }
+  .roomBtn:hover{ color:rgba(44,39,34,.78); background:rgba(255,255,255,.28); }
+  /* the clear pane: less fog, brighter, slightly wider breathing room */
+  .roomBtn.active{ color:rgba(38,33,28,.95); letter-spacing:.085em;
+            background:linear-gradient(180deg, rgba(255,255,255,.72), rgba(255,255,255,.42));
+            box-shadow:0 1px 0 rgba(255,255,255,.9) inset; }
+  .roomBtn:focus-visible{ outline:2px solid rgba(44,39,34,.55); outline-offset:-4px; }
+  @media (max-width:700px){
+    #dock{ bottom:14px; }
+    .roomBtn{ padding:10px 13px; font-size:11px; letter-spacing:.03em; }
+  }
+
+  #credit{ position:fixed; bottom:14px; left:16px; z-index:3; opacity:.55; font-size:11px;
+           max-width:26vw; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   #credit a{ color:#e8c98a; }
-  #perf{ position:fixed; bottom:12px; right:12px; z-index:4; opacity:.65;
-          font-variant-numeric:tabular-nums; font-size:11.5px; }
-  #load{ position:fixed; inset:0; display:grid; place-items:center; z-index:5;
-         background:#0b0a08; transition:opacity .4s; font-size:14px; letter-spacing:.04em; }
-  #load.hide{ opacity:0; pointer-events:none; }
+  #perf{ position:fixed; bottom:14px; right:16px; z-index:3; opacity:.5;
+          font-variant-numeric:tabular-nums; font-size:11px; max-width:26vw;
+          white-space:nowrap; overflow:hidden; text-overflow:ellipsis; text-align:right; }
+  /* ---- Loader ----------------------------------------------------
+     Same weather as the transition: pale, drifting, unhurried. The room
+     name is the hero because that's the only thing worth reading here. */
+  #load{ position:fixed; inset:0; z-index:8; display:grid; place-items:center;
+         background:#fbf9f5; transition:opacity .7s ease, visibility .7s;
+         color:#2c2722; overflow:hidden; }
+  #load.hide{ opacity:0; visibility:hidden; pointer-events:none; }
+  #load .box{ position:relative; z-index:1; display:grid; justify-items:center; gap:26px;
+              width:min(86vw,420px); text-align:center; }
+  #load canvas{ width:190px; height:190px; }
+  #load .name{ font:400 27px/1.25 ui-serif, "Iowan Old Style", Georgia, serif;
+               letter-spacing:.012em; color:#241f1a; }
+  #load .lbl{ font-size:10.5px; letter-spacing:.28em; text-transform:uppercase;
+              color:rgba(44,39,34,.42); }
+  #load .bar{ width:170px; height:1px; background:rgba(44,39,34,.14); overflow:hidden; }
+  #load .bar i{ display:block; height:100%; width:0%; background:rgba(44,39,34,.55);
+                transition:width .3s cubic-bezier(.4,0,.2,1); }
+  #load .pct{ display:none; }
+
+  #wipe{ position:fixed; inset:0; z-index:7; pointer-events:none; opacity:0;
+         transition:opacity .6s cubic-bezier(.4,0,.2,1);
+         background:#fbf9f5; }
+  #wipe.on{ opacity:1; }
+  #wipe i{ position:absolute; border-radius:50%; filter:blur(46px);
+           background:radial-gradient(circle at 40% 40%,
+                     rgba(255,255,255,.98), rgba(247,243,236,.72) 45%, rgba(233,226,214,0) 72%);
+           transform:scale(.35); opacity:0;
+           transition:transform 1.15s cubic-bezier(.22,.61,.36,1), opacity .75s ease; }
+  #wipe.on i{ transform:scale(1.25); opacity:1; }
+  #wipe i:nth-child(1){ left:8%;  top:14%; width:58vw; height:58vw; transition-delay:0s; }
+  #wipe i:nth-child(2){ right:4%; top:30%; width:52vw; height:52vw; transition-delay:.07s; }
+  #wipe i:nth-child(3){ left:26%; bottom:2%; width:64vw; height:64vw; transition-delay:.13s; }
+  @media (prefers-reduced-motion: reduce){
+    #wipe, #wipe i{ transition-duration:.01ms !important; }
+  }
   #vig{ position:fixed; inset:0; pointer-events:none; z-index:1;
         background:radial-gradient(ellipse at 50% 48%, rgba(0,0,0,0) 48%,
                    rgba(0,0,0,0.18) 82%, rgba(0,0,0,0.42) 100%); }
@@ -57,7 +118,15 @@
 <div id="vig"></div>
 <div id="credit"></div>
 <div id="perf"></div>
-<div id="load">loading…</div>
+<div id="dock"></div>
+<div id="wipe"><i></i><i></i><i></i></div>
+<div id="load"><div class="box">
+  <canvas id="loadArt" width="264" height="264"></canvas>
+  <div class="name" id="loadName">Sansara</div>
+  <div class="lbl" id="loadPhase">opening</div>
+  <div class="bar"><i id="loadBar"></i></div>
+  <div class="pct" id="loadPct">0%</div>
+</div></div>
 <script type="importmap">
 { "imports": {
     "three": "https://cdn.jsdelivr.net/npm/three@0.166.1/build/three.module.js",
@@ -85,8 +154,10 @@ const ROOMS = {
     spawn: [-34, 5],          // XZ hint; snapped to the nearest walkable cell
     credit: 'Backrooms VR by carlcapu9 — CC Attribution',
     creditUrl: 'https://sketchfab.com/carlcapu9',
-    fog: [0x1a1710, 0.012],
-    charLight: { sky:0xfff0c4, ground:0xb59a63, dir:0xfff4d2, amb:0.55, hemi:0.75, dirI:0.85 },
+    fog: [0x141109, 0.030],
+    exposure: 0.62, charScale: 0.78,
+    charLight: { sky:0xfff0c4, ground:0xb59a63, dir:0xfff4d2, amb:0.40, hemi:0.45, dirI:0.55 },
+    env: { wall:0xb9a06a, panel:0xffe9b8, floor:0x6b5a34, intensity:0.95 },
   },
   lobby: {
     label: 'Liminal Room',
@@ -94,8 +165,10 @@ const ROOMS = {
     baked: true,
     spawn: [0, 0],
     credit: 'VR Liminal Room (baked) — Sketchfab',
-    fog: [0x2a2418, 0.01],
-    charLight: { sky:0xffeec0, ground:0xa8905c, dir:0xfff2cc, amb:0.5, hemi:0.7, dirI:0.8 },
+    fog: [0x241d12, 0.016],
+    exposure: 0.82, charScale: 0.92,
+    charLight: { sky:0xffeec0, ground:0xa8905c, dir:0xfff2cc, amb:0.35, hemi:0.4, dirI:0.5 },
+    env: { wall:0xa88f5e, panel:0xffe3ad, floor:0x54402a, intensity:1.0 },
   },
   pool: {
     label: 'Pool Room',
@@ -103,8 +176,10 @@ const ROOMS = {
     baked: false,
     spawn: [0, 0],
     credit: 'Liminal Pool Room — Sketchfab',
-    lights: { ambient: 0.8, hemi: 0.9, dir: 0.9, sky: 0xcfe4f2, ground: 0x6a6250 },
-    fog: [0x243038, 0.014],
+    lights: { ambient: 0.22, hemi: 0.45, dir: 1.5, sky: 0xdff0fb, ground: 0x8fa6ad },
+    env: { wall:0xcfe0e8, panel:0xffffff, floor:0x7d939c, intensity:1.5 },
+    fog: [0x2d3c44, 0.010],
+    exposure: 0.95, charScale: 1.0,
   },
   dreamcore: {
     label: 'Dreamcore',
@@ -112,8 +187,10 @@ const ROOMS = {
     baked: false,
     spawn: [-74, 0],
     credit: 'Dreamcore Liminal Space — Sketchfab',
-    lights: { ambient: 1.15, hemi: 1.5, dir: 2.4, sky: 0xbcd8f5, ground: 0x9a8f5e },
-    fog: [0xb9c6d6, 0.0035],
+    lights: { ambient: 0.35, hemi: 0.9, dir: 2.6, sky: 0xbcd8f5, ground: 0x9a8f5e },
+    env: { wall:0xa9c6e4, panel:0xfff4dd, floor:0x8b8256, intensity:1.6 },
+    fog: [0xc3d2e0, 0.0030],
+    exposure: 1.05, charScale: 1.0,
   },
 };
 const params = new URLSearchParams(location.search);
@@ -123,7 +200,7 @@ let roomKey = ROOMS[params.get('room')] ? params.get('room') : 'backrooms';
 const TUNE = {
   walkSpeed: 1.47, runSpeed: 4.86, accel: 26, decel: 20, airAccel: 7, turnRate: 13,
   gravity: 24, jumpVel: 8.4, jumpWindup: 0.33, landHold: 0.40, animRate: 1.0,
-  camDist: 3.6, camHeight: 1.65, exposure: 1.0, fogDensity: 1.0,
+  camDist: 3.6, camHeight: 1.65, exposure: 1.0, fogDensity: 1.0, charScale: 1.0,
 };
 const TUNE_SPEC = [
   ['walkSpeed','Walk speed',0.4,6,0.05], ['runSpeed','Run speed',1,16,0.1],
@@ -133,6 +210,7 @@ const TUNE_SPEC = [
   ['landHold','Land hold (s)',0,1.2,0.01], ['animRate','Anim rate ×',0.4,2.5,0.05],
   ['camDist','Camera dist',1.2,14,0.1], ['camHeight','Camera height',0.5,5,0.05],
   ['exposure','Exposure',0.3,2.2,0.02], ['fogDensity','Fog ×',0,3,0.05],
+  ['charScale','Character size',0.4,1.6,0.01],
 ];
 const DEFAULTS = {...TUNE};
 
@@ -169,6 +247,7 @@ function buildCollision(root, box){
   const tris = [];                        // vertical faces, kept for pass 3
   const flats = [];                       // horizontal faces, kept for pass 2
   const hist = new Map();                 // quantised height -> area weight
+  let sawUpFace = false;                  // did any face actually point upward?
 
   const a = new THREE.Vector3(), b = new THREE.Vector3(), c = new THREE.Vector3();
   const ab = new THREE.Vector3(), ac = new THREE.Vector3(), n = new THREE.Vector3();
@@ -197,16 +276,26 @@ function buildCollision(root, box){
       if (cx1 < cx0 || cz1 < cz0) continue;
 
       if (Math.abs(n.y) >= 0.6){
-        /* Horizontal face: a floor candidate. Which one is *the* floor gets
+        /* Horizontal face: a floor candidate. Which one is *the* floor is
            decided in pass 2 — taking the lowest would put the player at the
-           bottom of a pool instead of on the deck around it. */
-        if ((cx1-cx0) < 96 && (cz1-cz0) < 96){
-          flats.push(cx0,cx1,cz0,cz1,y0);
-          const q = Math.round(y0*4)/4;                     // 25cm buckets
-          const area = (cx1-cx0+1)*(cz1-cz0+1);
-          hist.set(q, (hist.get(q)||0) + area);
-        }
-      } else if ((cx1-cx0) < 64 && (cz1-cz0) < 64){
+           bottom of a pool instead of on the deck around it.
+
+           No size cap here: a real floor is often a handful of enormous
+           quads (81m across = 200 cells). Skipping large faces threw the
+           floor away and left only the small ceiling tiles to vote, which
+           put the player on the ceiling. */
+        const up = n.y > 0;
+        if (up) sawUpFace = true;
+        /* Store the plane, not a single height. Using the triangle's minimum Y
+           across its whole footprint sinks the player into sloped ground —
+           a hillside triangle can span metres of drop. Evaluating the plane at
+           each cell centre follows the surface instead. */
+        flats.push(cx0,cx1,cz0,cz1, up?1:0, n.x, n.y, n.z, n.x*a.x + n.y*a.y + n.z*a.z, y0, y1);
+        const q = Math.round(y0*4)/4;                     // 25cm buckets
+        const area = (cx1-cx0+1)*(cz1-cz0+1);
+        // Upward faces are what you can stand on, so they outvote ceilings.
+        hist.set(q, (hist.get(q)||0) + area*(up?4:1));
+      } else {
         tris.push(cx0,cx1,cz0,cz1,y0,y1);   // flat array: far less GC than objects
       }
     }
@@ -218,11 +307,18 @@ function buildCollision(root, box){
   let mode = 0, best = -1;
   for (const [h,w] of hist) if (w > best){ best = w; mode = h; }
   const bestDist = new Float32Array(nx*nz).fill(Infinity);
-  for (let t=0;t<flats.length;t+=5){
-    const cx0=flats[t], cx1=flats[t+1], cz0=flats[t+2], cz1=flats[t+3], y=flats[t+4];
-    const dist = Math.abs(y - mode);
+  for (let t=0;t<flats.length;t+=11){
+    const cx0=flats[t], cx1=flats[t+1], cz0=flats[t+2], cz1=flats[t+3], up=flats[t+4];
+    const nX=flats[t+5], nY=flats[t+6], nZ=flats[t+7], d=flats[t+8];
+    const yLo=flats[t+9], yHi=flats[t+10];
+    if (sawUpFace && !up) continue;               // stand on floors, not ceilings
+    if (Math.abs(nY) < 1e-4) continue;
     for (let cz=cz0;cz<=cz1;cz++) for (let cx=cx0;cx<=cx1;cx++){
+      const wx = minX + (cx+0.5)*cell, wz = minZ + (cz+0.5)*cell;
+      let y = (d - nX*wx - nZ*wz) / nY;           // plane height at this cell
+      if (y < yLo) y = yLo; else if (y > yHi) y = yHi;
       const k = cz*nx+cx;
+      const dist = Math.abs(y - mode);
       if (dist < bestDist[k]){ bestDist[k] = dist; floorY[k] = y; }
     }
   }
@@ -288,6 +384,7 @@ function buildCollision(root, box){
 /* ====================== character (shared) ====================== */
 const CLIP_TRAVEL = { Walk: 85.28, Run: 149.23, Moonwalk: 49.83 };
 let avatar, mixer, actions={}, currentAction, nominal={}, footBones=[], blob;
+let clipGroundOffset={}, baseModelY=0, groundOffsetY=0;
 const SOLE_GAP = 0.03, _v = new THREE.Vector3();
 
 function posedExtents(root){
@@ -303,6 +400,15 @@ function posedExtents(root){
   });
   return box;
 }
+/* Character size is per room: these scenes were modelled by different
+   people at different scales, so one absolute height doesn't read right
+   everywhere. Exposed as a slider since it's a judgement call. */
+let baseCharScale = 1;
+function applyCharScale(){
+  if (!avatar) return;
+  avatar.children[0].scale.setScalar(baseCharScale * (TUNE.charScale || 1));
+}
+
 function play(name, fade=0.18){
   if (!mixer || !actions[name] || currentAction===name) return;
   if (currentAction) actions[currentAction].fadeOut(fade);
@@ -327,8 +433,62 @@ function makeBlobShadow(){
   return m;
 }
 
+
+/* Per-clip ground offset.
+
+   Correcting the model's height every frame so the lowest foot sits exactly
+   on the floor also cancels the gait's natural rise during push-off, which
+   makes the legs compress and stretch to compensate — it reads as a limp.
+   Instead each clip is sampled once through its cycle, and the single lowest
+   moment becomes a constant offset. Feet plant, and the bob survives. */
+function computeClipGroundOffsets(model, baseY){
+  const offs = {};
+  const names = Object.keys(actions);
+  const saved = currentAction;
+  const v = new THREE.Vector3();
+  const SAMPLES = 14, VSTEP = 4;      // every 4th vertex is plenty for a minimum
+  for (const name of names){
+    const act = actions[name];
+    for (const a of Object.values(actions)){ a.stop(); a.setEffectiveWeight(0); }
+    act.reset().play(); act.setEffectiveWeight(1); act.paused = true;
+    const dur = act.getClip().duration || 0.001;
+    let minY = Infinity;
+    for (let i=0;i<SAMPLES;i++){
+      act.time = (i/SAMPLES)*dur;
+      mixer.update(0);
+      avatar.updateMatrixWorld(true);
+      model.traverse(o=>{
+        if (!o.isSkinnedMesh || !o.skeleton) return;
+        const attr = o.geometry.attributes.position;
+        for (let k=0;k<attr.count;k+=VSTEP){
+          v.fromBufferAttribute(attr,k);
+          o.applyBoneTransform(k,v);
+          o.localToWorld(v);
+          if (v.y < minY) minY = v.y;
+        }
+      });
+    }
+    act.paused = false; act.stop(); act.setEffectiveWeight(0);
+    offs[name] = isFinite(minY) ? baseY - minY : baseY;
+  }
+  for (const a of Object.values(actions)) a.setEffectiveWeight(1);
+  currentAction = null;
+  if (saved && actions[saved]) play(saved, 0);
+
+  /* Clamp to a band around the median. A clip whose rig sits at a very
+     different height — Mixamo's hard landing starts in a deep crouch, its
+     hips a body-width below every other clip — would otherwise drive the
+     model straight through the floor. Locomotion clips agree closely, so
+     the median is a reliable anchor. */
+  const vals = Object.values(offs).sort((a,b)=>a-b);
+  const median = vals.length ? vals[vals.length>>1] : baseY;
+  for (const k of Object.keys(offs))
+    offs[k] = THREE.MathUtils.clamp(offs[k], median-0.12, median+0.12);
+  return offs;
+}
+
 async function loadAvatar(){
-  const gltf = await loadGLB('output/minimal-scifi-sikh-animated.glb');
+  const gltf = await loadGLB('output/minimal-scifi-sikh-animated.glb?v=3');
   gltf.scene.traverse(o=>{ if(o.isMesh) o.frustumCulled = false; });
   avatar = new THREE.Group(); avatar.add(gltf.scene);
   mixer = new THREE.AnimationMixer(avatar);
@@ -344,9 +504,14 @@ async function loadAvatar(){
   const box = posedExtents(gltf.scene);
   const size = box.getSize(new THREE.Vector3());
   const s = 1.75/size.y;
+  baseCharScale = s;
   gltf.scene.scale.setScalar(s);
   gltf.scene.position.set(-(box.min.x+size.x/2)*s, -box.min.y*s, -(box.min.z+size.z/2)*s);
   avatar.updateMatrixWorld(true);
+  baseModelY = gltf.scene.position.y;
+  clipGroundOffset = computeClipGroundOffsets(gltf.scene, baseModelY);
+  groundOffsetY = clipGroundOffset[currentAction] ?? baseModelY;
+  gltf.scene.position.y = groundOffsetY;
 
   // Hips travel is in rig units (~100x mesh units), so the conversion
   // needs the Hips' world scale, not the mesh scale.
@@ -361,6 +526,62 @@ async function loadAvatar(){
   if (nominal.Walk) TUNE.walkSpeed = DEFAULTS.walkSpeed = +nominal.Walk.toFixed(2);
   if (nominal.Run)  TUNE.runSpeed  = DEFAULTS.runSpeed  = +nominal.Run.toFixed(2);
   blob = makeBlobShadow();
+}
+
+/* ====================== image-based lighting ====================
+   The thing that makes an offline render read as "ray traced" is that
+   surfaces receive light from every direction, not from a handful of
+   point lights. Prefiltering a small environment scene into a mip chain
+   (PMREM) buys exactly that: soft omnidirectional light plus
+   roughness-aware reflections, evaluated per pixel from one cubemap.
+
+   It's the same move the film industry made when image-based lighting
+   replaced rigs of 50+ lights, and it's cheap — the cubemap is built once
+   at load, so runtime cost is a texture sample rather than N light
+   evaluations. Built from geometry here instead of a downloaded HDRI so
+   the page stays self-contained and the warmth is tunable per room. */
+const pmrem = new THREE.PMREMGenerator(renderer);
+pmrem.compileEquirectangularShader();
+let envRT = null;
+
+function buildEnvironment(cfg){
+  const c = cfg || { wall:0x9a9a9a, panel:0xffffff, floor:0x555555, intensity:1 };
+  const env = new THREE.Scene();
+  const box = new THREE.BoxGeometry(1,1,1);
+  box.deleteAttribute('uv');
+
+  const shell = new THREE.Mesh(box, new THREE.MeshStandardMaterial({
+    color:c.wall, roughness:1, metalness:0, side:THREE.BackSide }));
+  shell.scale.set(22, 13, 22);
+  env.add(shell);
+
+  const ground = new THREE.Mesh(box, new THREE.MeshStandardMaterial({
+    color:c.floor, roughness:1, metalness:0 }));
+  ground.scale.set(22, 0.4, 22); ground.position.y = -6.4;
+  env.add(ground);
+
+  // Emissive panels overhead are what produce the soft top-down falloff.
+  const panelMat = new THREE.MeshBasicMaterial({ color:c.panel });
+  const panel = (x,z,sx,sz)=>{
+    const m = new THREE.Mesh(box, panelMat);
+    m.position.set(x, 6.0, z); m.scale.set(sx, 0.2, sz);
+    env.add(m);
+  };
+  panel(-5.5, -5.5, 7, 7); panel(5.5, -5.5, 7, 7);
+  panel(-5.5,  5.5, 7, 7); panel(5.5,  5.5, 7, 7);
+  panel(0, 0, 4, 14);
+
+  env.add(new THREE.HemisphereLight(c.panel, c.floor, 1.0));
+  return env;
+}
+
+function applyEnvironment(cfg){
+  if (envRT){ envRT.dispose(); envRT = null; }
+  const envScene = buildEnvironment(cfg);
+  envRT = pmrem.fromScene(envScene, 0.04);
+  scene.environment = envRT.texture;
+  scene.environmentIntensity = (cfg && cfg.intensity) || 1.0;
+  envScene.traverse(o=>{ if (o.isMesh){ o.geometry.dispose(); o.material.dispose(); } });
 }
 
 /* ======================== room switching ======================= */
@@ -383,21 +604,27 @@ function disposeRoom(){
 
 async function loadRoom(key){
   const cfg = ROOMS[key];
-  document.getElementById('load').classList.remove('hide');
-  document.getElementById('load').textContent = `loading ${cfg.label}…`;
+  showLoader(cfg.label);
+  setProgress(0.02, 'opening');
 
   if (scene) disposeRoom(); else scene = new THREE.Scene();
   // drop everything but the avatar so lighting doesn't accumulate per room
   for (const child of [...scene.children]) if (child !== avatar && child !== blob) scene.remove(child);
 
   let gltf;
-  try { gltf = await loadGLB(cfg.file); }
-  catch(e){
-    document.getElementById('load').textContent =
-      `${cfg.label} isn't available here yet — try another room.`;
+  try {
+    gltf = await new Promise((res,rej)=>loader.load(cfg.file, res, ev=>{
+      if (ev.lengthComputable) setProgress(0.05 + 0.75*(ev.loaded/ev.total), 'loading the room');
+      else setProgress(Math.min(0.7, 0.05 + ev.loaded/6e6), 'loading the room');
+    }, rej));
+  } catch(e){
+    setProgress(1, 'unavailable');
+    document.getElementById('loadName').textContent = `${cfg.label} isn't published here yet`;
+    document.getElementById('loadPhase').textContent = 'not published here yet';
     buildHud();
     return;                     // keep the previous room's grid usable
   }
+  setProgress(0.84, 'setting the light');
   roomRoot = gltf.scene;
 
   /* Baked scenes: force unlit. Reproduces the artist's lighting exactly
@@ -431,21 +658,34 @@ async function loadRoom(key){
       o.material = Array.isArray(o.material) ? next : next[0];
     });
   } else {
-    const L = cfg.lights || { ambient:0.5, hemi:0.5, dir:0.5, sky:0xdfe8f5, ground:0x8a8460 };
+    /* With IBL carrying the ambient, the remaining lights only need to
+       supply direction and highlights — a big flat ambient would just
+       wash the environment contribution out again. */
+    const L = cfg.lights || { ambient:0.3, hemi:0.5, dir:1.2, sky:0xdfe8f5, ground:0x8a8460 };
     scene.add(new THREE.AmbientLight(0xffffff, L.ambient));
     scene.add(new THREE.HemisphereLight(L.sky, L.ground, L.hemi));
-    const d = new THREE.DirectionalLight(0xfff4e2, L.dir);
-    d.position.set(30, 60, 20);
-    scene.add(d);
+    const key = new THREE.DirectionalLight(0xfff4e2, L.dir);
+    key.position.set(28, 55, 18);
+    scene.add(key);
+    const fill = new THREE.DirectionalLight(L.sky, L.dir*0.28);
+    fill.position.set(-30, 24, -22);
+    scene.add(fill);
   }
+  applyEnvironment(cfg.env);
   scene.add(roomRoot);
 
   const box = new THREE.Box3().setFromObject(roomRoot);
+  TUNE.exposure = DEFAULTS.exposure = cfg.exposure ?? 1.0;
+  TUNE.charScale = DEFAULTS.charScale = cfg.charScale ?? 1.0;
+  applyCharScale();
   baseFog = cfg.fog || [0x1a1710, 0.012];
   scene.fog = new THREE.FogExp2(baseFog[0], baseFog[1]*TUNE.fogDensity);
   scene.background = new THREE.Color(baseFog[0]);
 
+  setProgress(0.9, 'finding the floor');
+  await new Promise(r=>setTimeout(r,0));      // let the loader paint before the blocking pass
   grid = buildCollision(roomRoot, box);
+  setProgress(0.98, 'stepping in');
   const [sx, sz] = grid.findSpawn(cfg.spawn[0], cfg.spawn[1]);
   pos.set(sx, grid.groundAt(sx, sz, box.min.y), sz);
   vel.set(0,0,0); vy = 0; grounded = true; windupT = 0; landT = 0;
@@ -475,7 +715,8 @@ async function loadRoom(key){
     ? `${cfg.label} — <a href="${cfg.creditUrl}" target="_blank" rel="noopener">${cfg.credit}</a>`
     : `${cfg.label} — ${cfg.credit}`;
   buildHud();
-  setTimeout(()=>document.getElementById('load').classList.add('hide'), 120);
+  setProgress(1, 'here');
+  setTimeout(hideLoader, 260);
 }
 let roomStats = '';
 
@@ -517,6 +758,7 @@ function moveWithCollision(dx, dz){
 const clock = new THREE.Clock();
 let elapsed = 0, fpsT = 0, frames = 0;
 window.__rooms = { keys, pos, vel, TUNE, THREE, step:()=>tick(),
+  get avatar(){return avatar;}, get offsets(){return clipGroundOffset;},
   get room(){return roomKey;}, get grid(){return grid;}, get stats(){return roomStats;},
   probe(){ return { pos:{x:+pos.x.toFixed(2),y:+pos.y.toFixed(2),z:+pos.z.toFixed(2)},
                     ground:+grid.groundAt(pos.x,pos.z,0).toFixed(2), grounded,
@@ -587,11 +829,12 @@ function tick(){
     avatar.position.copy(pos);
     mixer.update(dt);
 
-    if (footBones.length && grounded && windupT<=0){
-      avatar.updateMatrixWorld(true);
-      let lowest = Infinity;
-      for (const b of footBones){ b.getWorldPosition(_v); if (_v.y<lowest) lowest=_v.y; }
-      if (isFinite(lowest)) avatar.children[0].position.y -= ((lowest-SOLE_GAP)-pos.y)*Math.min(1,9*dt);
+    /* Constant per-clip ground offset rather than a per-frame correction —
+       correcting every frame cancels the gait's rise and reads as a limp. */
+    if (currentAction){
+      const target = (clipGroundOffset[currentAction] ?? baseModelY) - SOLE_GAP;
+      groundOffsetY += (target - groundOffsetY) * Math.min(1, 10*dt);
+      avatar.children[0].position.y = groundOffsetY;
     }
     if (blob){
       blob.position.set(pos.x, ground + 0.012, pos.z);
@@ -624,33 +867,111 @@ function tick(){
   frames++; fpsT += dt;
   if (fpsT>=1){
     document.getElementById('perf').textContent =
-      `${Math.round(frames/fpsT)} fps · ${renderer.info.render.calls} calls · ${roomStats}`;
+      `${Math.round(frames/fpsT)} fps · ${renderer.info.render.calls} calls`;
     frames=0; fpsT=0;
   }
 }
 
-/* ============================== UI ============================= */
+/* ============================== UI =============================
+   Loader art is drawn on a 2D canvas rather than in WebGL: it has to run
+   *before* the renderer has anything to show, and a wireframe projected by
+   hand costs nothing while the GPU is busy decoding textures. */
+const loadArt = document.getElementById('loadArt');
+const artCtx = loadArt.getContext('2d');
+let artT = 0, artRAF = 0, artProgress = 0;
+
+/* Slow-drifting soft forms — the same weather as the transition, so the
+   loader and the room change feel like one gesture rather than two effects. */
+const BLOBS = Array.from({length:5}, (_,i)=>({
+  a: (i/5)*Math.PI*2,
+  r: 26 + i*7,
+  s: 34 + (i%3)*13,
+  sp: 0.16 + i*0.045,
+}));
+
+function drawArt(){
+  const w = loadArt.width, h = loadArt.height, cx = w/2, cy = h/2;
+  artCtx.clearRect(0,0,w,h);
+  artT += 0.006;
+
+  for (const b of BLOBS){
+    const a = b.a + artT*b.sp;
+    const x = cx + Math.cos(a)*b.r, y = cy + Math.sin(a*1.3)*b.r*0.62;
+    const g = artCtx.createRadialGradient(x,y,0, x,y,b.s);
+    g.addColorStop(0,   'rgba(255,255,255,0.95)');
+    g.addColorStop(0.45,'rgba(244,239,230,0.55)');
+    g.addColorStop(1,   'rgba(228,220,208,0)');
+    artCtx.fillStyle = g;
+    artCtx.beginPath(); artCtx.arc(x,y,b.s,0,Math.PI*2); artCtx.fill();
+  }
+
+  // a single hairline ring carrying progress, drawn over the weather
+  artCtx.lineWidth = 1.25;
+  artCtx.strokeStyle = 'rgba(44,39,34,.13)';
+  artCtx.beginPath(); artCtx.arc(cx,cy,86,0,Math.PI*2); artCtx.stroke();
+  artCtx.strokeStyle = 'rgba(44,39,34,.5)';
+  artCtx.beginPath();
+  artCtx.arc(cx,cy,86, -Math.PI/2, -Math.PI/2 + Math.PI*2*artProgress);
+  artCtx.stroke();
+
+  artRAF = requestAnimationFrame(drawArt);
+}
+function startArt(){ if (!artRAF) drawArt(); }
+function stopArt(){ cancelAnimationFrame(artRAF); artRAF = 0; }
+
+function setProgress(p, phase){
+  artProgress = THREE.MathUtils.clamp(p, 0, 1);
+  document.getElementById('loadBar').style.width = (artProgress*100).toFixed(0)+'%';
+  document.getElementById('loadPct').textContent = (artProgress*100).toFixed(0)+'%';
+  if (phase) document.getElementById('loadPhase').textContent = phase;
+}
+function showLoader(name){
+  document.getElementById('loadName').textContent = name;
+  document.getElementById('load').classList.remove('hide');
+  startArt();
+}
+function hideLoader(){
+  document.getElementById('load').classList.add('hide');
+  setTimeout(stopArt, 600);
+}
+
 function buildHud(){
   const hud = document.getElementById('hud');
   hud.innerHTML = `<span class="keys"><b>WASD</b> move · <b>Shift</b> run · <b>Space</b> jump ·
     <b>F</b> dance · <b>M</b> moonwalk · drag to look</span>
     <a href="index.html">← back</a>`;
-  const wrap = document.createElement('span');
-  wrap.style.cssText = 'display:flex;gap:6px;flex-wrap:wrap';
+  const dock = document.getElementById('dock');
+  dock.innerHTML = '';
   for (const [k,cfg] of Object.entries(ROOMS)){
     const b = document.createElement('button');
     b.className = 'roomBtn' + (k===roomKey ? ' active' : '');
     b.textContent = cfg.label;
-    b.onclick = async ()=>{
-      if (k===roomKey) return;
-      roomKey = k;
-      history.replaceState(null,'',`?room=${k}`);
-      await loadRoom(k);
-    };
-    wrap.appendChild(b);
+    b.setAttribute('aria-current', k===roomKey ? 'true' : 'false');
+    b.onclick = ()=>switchRoom(k);
+    dock.appendChild(b);
   }
-  hud.appendChild(wrap);
 }
+
+/* Number keys jump straight to a room; the wipe hides the load hitch so a
+   switch feels like a cut rather than a stall. */
+let switching = false;
+async function switchRoom(k){
+  if (k === roomKey || switching || !ROOMS[k]) return;
+  switching = true;
+  const wipe = document.getElementById('wipe');
+  wipe.classList.add('on');
+  await new Promise(r=>setTimeout(r, 620));
+  roomKey = k;
+  history.replaceState(null,'',`?room=${k}`);
+  await loadRoom(k);
+  wipe.classList.remove('on');
+  switching = false;
+}
+addEventListener('keydown', e=>{
+  if (e.metaKey||e.ctrlKey||e.altKey) return;
+  const n = parseInt(e.key,10);
+  if (n>=1 && n<=Object.keys(ROOMS).length) switchRoom(Object.keys(ROOMS)[n-1]);
+});
 let panelShown = false, typed = '';
 function showPanel(on){ panelShown = on; document.getElementById('tune').classList.toggle('shown', on); }
 function tuneSnapshot(){
@@ -677,6 +998,7 @@ function buildPanel(){
     const k = e.target.dataset.key; if (!k) return;
     TUNE[k] = parseFloat(e.target.value);
     e.target.parentElement.querySelector('output').textContent = TUNE[k];
+    if (k === 'charScale') applyCharScale();
   });
   document.getElementById('tuneToggle').onclick = ()=>showPanel(false);
   document.getElementById('tuneReset').onclick = ()=>{ Object.assign(TUNE, DEFAULTS); syncPanel(); };

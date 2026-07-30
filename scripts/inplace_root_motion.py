@@ -61,7 +61,14 @@ def flatten(path_in, path_out, flatten_vertical=()):
                 axes.append(VERTICAL_AXIS)
 
             for axis in axes:
-                base = struct.unpack_from('<f', data, offset + axis * 4)[0]
+                if axis == VERTICAL_AXIS:
+                    # Anchor to the clip's lowest point, not its first frame: a
+                    # landing clip starts mid-air, so pinning to frame 0 leaves
+                    # the whole clip suspended at fall height.
+                    base = min(struct.unpack_from('<f', data, offset + f * 12 + axis * 4)[0]
+                               for f in range(count))
+                else:
+                    base = struct.unpack_from('<f', data, offset + axis * 4)[0]
                 for frame in range(count):
                     struct.pack_into('<f', data, offset + frame * 12 + axis * 4, base)
 

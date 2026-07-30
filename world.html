@@ -402,6 +402,7 @@ const TUNE_SPEC = [
    the body speed should match so the feet plant instead of skating. */
 const CLIP_TRAVEL = { Walk: 85.28, Run: 149.23, Moonwalk: 49.83 };
 let avatar, mixer, actions={}, currentAction, modelScale=1, nominal={}, footBones=[];
+let clipGroundOffset={}, baseModelY=0, groundOffsetY=0;
 const _v = new THREE.Vector3();
 const AVATAR_URLS = ['output/minimal-scifi-sikh-animated.glb','source/minimal-scifi-sikh.glb'];
 
@@ -417,6 +418,60 @@ function posedExtents(root){
     }
   });
   return box;
+}
+
+
+/* Per-clip ground offset.
+
+   Correcting the model's height every frame so the lowest foot sits exactly
+   on the floor also cancels the gait's natural rise during push-off, which
+   makes the legs compress and stretch to compensate — it reads as a limp.
+   Instead each clip is sampled once through its cycle, and the single lowest
+   moment becomes a constant offset. Feet plant, and the bob survives. */
+function computeClipGroundOffsets(model, baseY){
+  const offs = {};
+  const names = Object.keys(actions);
+  const saved = currentAction;
+  const v = new THREE.Vector3();
+  const SAMPLES = 14, VSTEP = 4;      // every 4th vertex is plenty for a minimum
+  for (const name of names){
+    const act = actions[name];
+    for (const a of Object.values(actions)){ a.stop(); a.setEffectiveWeight(0); }
+    act.reset().play(); act.setEffectiveWeight(1); act.paused = true;
+    const dur = act.getClip().duration || 0.001;
+    let minY = Infinity;
+    for (let i=0;i<SAMPLES;i++){
+      act.time = (i/SAMPLES)*dur;
+      mixer.update(0);
+      avatar.updateMatrixWorld(true);
+      model.traverse(o=>{
+        if (!o.isSkinnedMesh || !o.skeleton) return;
+        const attr = o.geometry.attributes.position;
+        for (let k=0;k<attr.count;k+=VSTEP){
+          v.fromBufferAttribute(attr,k);
+          o.applyBoneTransform(k,v);
+          o.localToWorld(v);
+          if (v.y < minY) minY = v.y;
+        }
+      });
+    }
+    act.paused = false; act.stop(); act.setEffectiveWeight(0);
+    offs[name] = isFinite(minY) ? baseY - minY : baseY;
+  }
+  for (const a of Object.values(actions)) a.setEffectiveWeight(1);
+  currentAction = null;
+  if (saved && actions[saved]) play(saved, 0);
+
+  /* Clamp to a band around the median. A clip whose rig sits at a very
+     different height — Mixamo's hard landing starts in a deep crouch, its
+     hips a body-width below every other clip — would otherwise drive the
+     model straight through the floor. Locomotion clips agree closely, so
+     the median is a reliable anchor. */
+  const vals = Object.values(offs).sort((a,b)=>a-b);
+  const median = vals.length ? vals[vals.length>>1] : baseY;
+  for (const k of Object.keys(offs))
+    offs[k] = THREE.MathUtils.clamp(offs[k], median-0.12, median+0.12);
+  return offs;
 }
 
 async function loadAvatar(){
@@ -446,6 +501,10 @@ async function loadAvatar(){
     gltf.scene.position.set(-(box.min.x+size.x/2)*modelScale, -box.min.y*modelScale,
                             -(box.min.z+size.z/2)*modelScale);
     avatar.updateMatrixWorld(true);
+    baseModelY = gltf.scene.position.y;
+    if (mixer) clipGroundOffset = computeClipGroundOffsets(gltf.scene, baseModelY);
+    groundOffsetY = clipGroundOffset[currentAction] ?? baseModelY;
+    gltf.scene.position.y = groundOffsetY;
 
     /* Hips translation is authored in rig units (~100× the mesh units,
        Mixamo exports centimetres), so converting travel to world units
