@@ -40,7 +40,8 @@ around a desert village.
   so holding a key always walks even when drag or a wall has killed the velocity.
 - **Animation sync** — each clip's true stride speed is derived from its Hips travel and used both
   to set the body's default speed and to scale playback, so the feet plant instead of skating. The
-  Jump clip crouches for 0.33 s before leaving the ground, and the impulse waits for it.
+  Jump clip is compressed into a responsive 0.12 s anticipation before takeoff, and the impulse
+  waits for that authored crouch rather than firing under an idle pose.
 - **Tuning panel** — hidden by default; type `dev` to fade it in. Sliders for every value the feel
   depends on (speeds, accel, gravity, jump power and windup, turn rate, camera) plus a
   **Copy to clipboard** button that emits a paste-ready `TUNE { … }` block, so a feel that works can
@@ -123,6 +124,9 @@ Full commands are in [docs/pipeline.md](docs/pipeline.md).
   **CC Attribution** — used in the Liminal Rooms experiment.
 - **Character mesh** — generated with [mint.gg](https://mint.gg).
 - **Animation clips** — [Mixamo](https://www.mixamo.com) (Adobe).
+- **Universal Animation Library** — [Quaternius](https://quaternius.itch.io/universal-animation-library),
+  with animation contributions by [Gonzalo Furnier](https://x.com/Gonzalo_Anim), released under
+  **CC0**. The library is the source for the next locomotion and action pass.
 - **Engine** — [Three.js](https://threejs.org).
 
 Code in this repository is MIT licensed. The third-party assets keep their own licenses.

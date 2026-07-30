@@ -6,15 +6,17 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <style>
   body { margin:0; background:#e9c893; overflow:hidden; font:13px/1.5 system-ui,-apple-system,sans-serif; }
-  #hud { position:fixed; top:14px; left:14px; color:#4a3620; background:#fff6e6cc; backdrop-filter:blur(6px);
-         padding:9px 14px; border-radius:10px; z-index:2; box-shadow:0 2px 12px #7a5a3022; }
-  #hud b { color:#8a5a20; }
-  #status { position:fixed; bottom:14px; left:14px; color:#fff2dd; text-shadow:0 1px 3px #00000066;
-            opacity:.85; z-index:2; }
-  #perf { position:fixed; bottom:14px; right:14px; color:#fff2dd; text-shadow:0 1px 3px #00000066;
-          opacity:.7; z-index:2; font-variant-numeric:tabular-nums; }
+  #hud { position:fixed; top:18px; left:50%; transform:translateX(-50%); color:#33415f;
+         background:rgba(249,252,255,.62); backdrop-filter:blur(18px) saturate(145%);
+         padding:9px 16px; border-radius:999px; z-index:2; white-space:nowrap;
+         border:1px solid rgba(255,255,255,.78); box-shadow:0 14px 42px rgba(73,96,140,.15); }
+  #hud b { color:#22304f; }
+  #status { position:fixed; bottom:16px; left:16px; color:rgba(255,255,255,.86);
+            text-shadow:0 1px 4px rgba(35,42,58,.32); opacity:.85; z-index:2; }
+  #perf { position:fixed; bottom:16px; right:16px; color:rgba(255,255,255,.86);
+          text-shadow:0 1px 4px rgba(35,42,58,.32); opacity:.76; z-index:2; font-variant-numeric:tabular-nums; }
 
-  #hud a{ color:#8a5a20; }
+  #hud a{ color:#597fbf; }
   /* Hidden until the `dev` sequence is typed — keeps the shared link clean.
      visibility (not display) so the fade can actually run. */
   #tune{ position:fixed; top:14px; right:14px; z-index:3; width:242px;
@@ -404,7 +406,7 @@ const CLIP_TRAVEL = { Walk: 85.28, Run: 149.23, Moonwalk: 49.83 };
 let avatar, mixer, actions={}, currentAction, modelScale=1, nominal={}, footBones=[];
 let clipGroundOffset={}, baseModelY=0, groundOffsetY=0;
 const _v = new THREE.Vector3();
-const AVATAR_URLS = ['output/minimal-scifi-sikh-animated.glb','source/minimal-scifi-sikh.glb'];
+const AVATAR_URLS = ['output/minimal-scifi-sikh-animated.glb?v=4','source/minimal-scifi-sikh.glb'];
 
 function posedExtents(root){
   const box = new THREE.Box3(), v = new THREE.Vector3();

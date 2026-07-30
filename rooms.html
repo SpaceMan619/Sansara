@@ -43,8 +43,8 @@
   #travel .travel-head{ position:absolute; top:max(34px,7vh); left:50%; transform:translateX(-50%);
            z-index:1; width:min(1120px,calc(100vw - 48px)); display:flex; align-items:flex-end;
            justify-content:space-between; color:#24304a; }
-  #travel .kicker{ font:500 10px/1 system-ui,sans-serif; letter-spacing:.28em;
-           text-transform:uppercase; color:rgba(36,48,74,.66); }
+  #travel .kicker{ font:500 11px/1 system-ui,sans-serif; letter-spacing:.16em;
+           text-transform:none; color:rgba(36,48,74,.66); }
   #travel .count{ font:400 13px/1 ui-serif,"Iowan Old Style",Georgia,serif;
            color:rgba(36,48,74,.58); }
   #travel .rail{ position:relative; z-index:1; display:flex; gap:13px; padding:26px 28px;
@@ -58,8 +58,9 @@
          background:rgba(255,255,255,.48); border:1px solid rgba(255,255,255,.84);
          box-shadow:0 18px 48px rgba(86,116,170,.13), inset 0 1px rgba(255,255,255,.72);
          transform:translateY(14px) scale(.965); opacity:0;
-         transition:transform .42s cubic-bezier(.2,.7,.3,1), opacity .32s ease,
-                    box-shadow .3s ease, border-color .3s ease; }
+         transition:transform .42s cubic-bezier(.16,1,.3,1), opacity .32s ease,
+                    box-shadow .34s cubic-bezier(.16,1,.3,1), border-color .3s ease;
+         will-change:transform; backface-visibility:hidden; }
   #travel.on .card:not(.sel):not(:hover){ transform:none; opacity:1; }
   #travel.on .card.sel, #travel.on .card:hover{ opacity:1; }
   #travel .card:nth-child(1){ transition-delay:.02s } #travel .card:nth-child(2){ transition-delay:.05s }
@@ -84,11 +85,11 @@
              color:rgba(36,48,74,.58); }
   .card.here .nm::after{ content:'  here'; font:600 8.5px/1 system-ui,sans-serif;
                          letter-spacing:.18em; text-transform:uppercase; color:#6f91d8; }
-  .card:hover{ transform:translateY(-5px); box-shadow:0 24px 58px rgba(86,116,170,.2); }
+  .card:hover{ transform:translate3d(0,-5px,0); box-shadow:0 24px 58px rgba(86,116,170,.2); }
   .card:hover .swatch{ transform:scale(1.075); }
   /* Keyboard selection has to read at a glance and not be confusable with
      hover: the card lifts further, gains a ring, and its name goes dark. */
-  .card.sel{ transform:translateY(-10px) scale(1.025);
+  .card.sel{ transform:translate3d(0,-10px,0) scale(1.025);
              box-shadow:0 28px 70px rgba(86,116,170,.24),
                         0 0 0 2px rgba(127,168,255,.78),
                         0 0 0 7px rgba(255,255,255,.62);
@@ -115,9 +116,12 @@
   #credit{ position:fixed; bottom:14px; left:16px; z-index:3; opacity:.55; font-size:11px;
            max-width:26vw; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   #credit a{ color:#e8c98a; }
-  #perf{ position:fixed; bottom:14px; right:16px; z-index:3; opacity:.5;
-          font-variant-numeric:tabular-nums; font-size:11px; max-width:26vw;
-          white-space:nowrap; overflow:hidden; text-overflow:ellipsis; text-align:right; }
+  #perf{ position:fixed; bottom:14px; right:16px; z-index:3;
+          font-variant-numeric:tabular-nums; font-size:10px; letter-spacing:.035em;
+          white-space:nowrap; text-align:right; color:rgba(36,48,74,.68);
+          padding:6px 10px; border-radius:999px; background:rgba(250,252,255,.58);
+          border:1px solid rgba(255,255,255,.72); backdrop-filter:blur(14px) saturate(140%);
+          box-shadow:0 8px 24px rgba(62,83,125,.1); }
   /* ---- Loader ----------------------------------------------------
      Same weather as the transition: pale, drifting, unhurried. The room
      name is the hero because that's the only thing worth reading here. */
@@ -176,32 +180,42 @@
   #vig{ position:fixed; inset:0; pointer-events:none; z-index:1;
         background:radial-gradient(ellipse at 50% 48%, rgba(0,0,0,0) 48%,
                    rgba(0,0,0,0.18) 82%, rgba(0,0,0,0.42) 100%); }
-  /* dev-only tuning panel — same `dev` unlock as the dune world */
+  /* Dev tools use the same pale glass as travel. The tools may be technical;
+     they do not need to feel like a different, dark application. */
   #tune{ position:fixed; top:12px; right:12px; z-index:6; width:236px;
-         background:#1a1712f2; backdrop-filter:blur(8px); border:1px solid #4a4335;
-         border-radius:12px; font-size:12px; overflow:hidden;
+         color:#293755; background:rgba(248,251,255,.74); backdrop-filter:blur(22px) saturate(145%);
+         border:1px solid rgba(255,255,255,.82); box-shadow:0 22px 68px rgba(65,87,132,.18);
+         border-radius:18px; font-size:12px; overflow:hidden;
          opacity:0; visibility:hidden; transform:translateY(-8px) scale(.985);
          transition:opacity .3s, transform .3s, visibility .3s linear; }
   #tune.shown{ opacity:1; visibility:visible; transform:none; }
   #tune .ph{ display:flex; justify-content:space-between; align-items:center;
-             padding:8px 10px; border-bottom:1px solid #3a352a; }
+             padding:10px 12px; border-bottom:1px solid rgba(83,108,157,.14); }
   #tune .pb{ padding:8px 10px 10px; max-height:72vh; overflow-y:auto; }
+  #tune .psection{ margin:12px 0 8px; color:rgba(41,55,85,.48); font-size:9px;
+                   font-weight:700; letter-spacing:.2em; text-transform:uppercase; }
   #tune label{ display:grid; grid-template-columns:1fr 38px; gap:2px 6px; margin-bottom:7px;
                align-items:center; }
   #tune label span{ opacity:.75; }
   #tune output{ text-align:right; font-weight:600; font-variant-numeric:tabular-nums; }
-  #tune input[type=range]{ grid-column:1/-1; width:100%; height:14px; margin:0; accent-color:#b7761f; }
-  #tune button{ font:inherit; color:#e8e4d8; background:#2a251c; border:1px solid #4a4335;
-                border-radius:6px; padding:4px 9px; cursor:pointer; }
-  #tune .pact{ display:flex; gap:6px; margin-top:11px; padding-top:10px; border-top:1px solid #3a352a; }
+  #tune input[type=range]{ grid-column:1/-1; width:100%; height:14px; margin:0; accent-color:#7b9fe0; }
+  #tune .look-colors{ display:grid; grid-template-columns:1fr auto; gap:7px 10px; align-items:center;
+                      margin-bottom:10px; }
+  #tune .look-colors label{ display:contents; }
+  #tune input[type=color]{ width:34px; height:24px; padding:2px; border-radius:8px; cursor:pointer;
+                          background:rgba(255,255,255,.65); border:1px solid rgba(83,108,157,.2); }
+  #tune button{ font:inherit; color:#344566; background:rgba(255,255,255,.6);
+                border:1px solid rgba(83,108,157,.2); border-radius:999px; padding:4px 9px; cursor:pointer; }
+  #tune button:hover{ background:rgba(255,255,255,.92); }
+  #tune .pact{ display:flex; gap:6px; margin-top:11px; padding-top:10px; border-top:1px solid rgba(83,108,157,.14); }
   #tune .devcam{ display:grid; grid-template-columns:1fr auto; gap:3px 8px; align-items:center;
-                 margin:3px 0 10px; padding:9px; border:1px solid #3a352a; border-radius:8px;
-                 background:#12100c; }
-  #tune .devcam small{ grid-column:1/-1; color:#9f9888; line-height:1.35; }
-  #tune #xrayToggle[aria-pressed="true"]{ background:#b7761f; border-color:#d79c4a; color:#fff; }
-  #tune #tuneCopy{ flex:1; background:#b7761f; border-color:#b7761f; color:#fff8ec; font-weight:600; }
+                 margin:3px 0 10px; padding:9px; border:1px solid rgba(83,108,157,.15); border-radius:12px;
+                 background:rgba(255,255,255,.42); }
+  #tune .devcam small{ grid-column:1/-1; color:rgba(41,55,85,.58); line-height:1.35; }
+  #tune #xrayToggle[aria-pressed="true"]{ background:#789ee1; border-color:#789ee1; color:#fff; }
+  #tune #tuneCopy{ flex:1; background:#789ee1; border-color:#789ee1; color:#fff; font-weight:600; }
   #tune .pcopy{ display:none; width:100%; margin-top:8px; font:11px ui-monospace,monospace;
-                background:#12100c; color:#e8e4d8; border:1px solid #4a4335; border-radius:6px; padding:6px; }
+                background:rgba(255,255,255,.72); color:#293755; border:1px solid rgba(83,108,157,.2); border-radius:9px; padding:6px; }
   @media (max-width:760px){ #tune{ display:none; } }
 </style>
 </head>
@@ -210,9 +224,9 @@
 <div id="tune"></div>
 <div id="vig"></div>
 <div id="credit"></div>
-<div id="perf"></div>
+<div id="perf" title="Measured wall-clock frame rate, average frame time, one-percent-low FPS, and draw calls">measuring frame pace…</div>
 <div id="travel" role="dialog" aria-modal="true" aria-label="Choose another place" aria-hidden="true">
-  <div class="travel-head"><span class="kicker">between places</span><span class="count" id="travelCount"></span></div>
+  <div class="travel-head"><span class="kicker">press tab to choose your world</span><span class="count" id="travelCount" aria-live="polite"></span></div>
   <div class="rail" id="rail" aria-label="Places"></div>
   <div class="hint">hold tab · ← → to choose · release to travel</div>
 </div>
@@ -310,8 +324,10 @@ let roomKey = ROOMS[params.get('room')] ? params.get('room') : 'dune';
 /* ========================= tuning params ======================== */
 const TUNE = {
   walkSpeed: 1.47, runSpeed: 4.86, accel: 26, decel: 20, airAccel: 7, turnRate: 13,
-  gravity: 24, jumpVel: 8.4, jumpWindup: 0.33, landHold: 0.40, animRate: 1.0,
+  gravity: 24, jumpVel: 8.4, jumpWindup: 0.12, landHold: 0.24, animRate: 1.0,
   camDist: 6.2, camHeight: 1.72, exposure: 1.0, fogDensity: 1.0, charScale: 1.0,
+  envIntensity: 1.0, ambientIntensity: 0.4, hemiIntensity: 0.6,
+  keyIntensity: 1.0, fillIntensity: 0.28,
 };
 const TUNE_SPEC = [
   ['walkSpeed','Walk speed',0.4,6,0.05], ['runSpeed','Run speed',1,16,0.1],
@@ -322,6 +338,9 @@ const TUNE_SPEC = [
   ['camDist','Camera dist',1.5,16,0.1], ['camHeight','Camera height',0.5,5,0.05],
   ['exposure','Exposure',0.3,2.2,0.02], ['fogDensity','Fog ×',0,3,0.05],
   ['charScale','Character size',0.4,1.6,0.01],
+  ['envIntensity','Environment',0,3,0.05], ['ambientIntensity','Ambient light',0,3,0.05],
+  ['hemiIntensity','Sky light',0,4,0.05], ['keyIntensity','Key light',0,6,0.05],
+  ['fillIntensity','Fill light',0,3,0.05],
 ];
 const DEFAULTS = {...TUNE};
 
@@ -340,6 +359,7 @@ const loader = new GLTFLoader();
 const loadGLB = url => new Promise((res,rej)=>loader.load(url,res,undefined,rej));
 
 let scene, roomRoot, grid = null, baseFog = [0,0], roomUpdate = null, roomSun = null;
+let devLights = { ambient:null, hemi:null, key:null, fill:null };
 
 /* ==================== collision from geometry ===================
    These scenes ship no collision data, so it gets derived from the
@@ -681,13 +701,18 @@ function computeClipGroundOffsets(model, baseY){
 }
 
 async function loadAvatar(){
-  const gltf = await loadGLB('output/minimal-scifi-sikh-animated.glb?v=3');
+  const gltf = await loadGLB('output/minimal-scifi-sikh-animated.glb?v=4');
   gltf.scene.traverse(o=>{ if(o.isMesh) o.frustumCulled = false; });
   avatar = new THREE.Group(); avatar.add(gltf.scene);
   mixer = new THREE.AnimationMixer(avatar);
   for (const c of gltf.animations) actions[c.name] = mixer.clipAction(c);
-  for (const once of ['Jump','Land'])
+  for (const once of ['Jump','Land','Jump_Start','Jump_Land'])
     if (actions[once]){ actions[once].setLoop(THREE.LoopOnce); actions[once].clampWhenFinished = true; }
+  if (actions.Jump_Loop) actions.Jump_Loop.setLoop(THREE.LoopRepeat);
+  if (hasStagedJump()){
+    TUNE.jumpWindup = DEFAULTS.jumpWindup = UAL_TAKEOFF;
+    TUNE.landHold = DEFAULTS.landHold = UAL_LAND_RECOVERY;
+  }
   play(actions.Idle ? 'Idle' : 'Walk');
   if (currentAction) actions[currentAction].setEffectiveWeight(1);
   mixer.update(0);
@@ -838,6 +863,7 @@ async function loadRoom(key){
   }
   setProgress(0.84, 'setting the light');
   roomRoot = built ? built.root : gltf.scene;
+  devLights = { ambient:null, hemi:null, key:null, fill:null };
 
   /* Baked scenes: force unlit. Reproduces the artist's lighting exactly
      and skips lighting math entirely. */
@@ -853,6 +879,7 @@ async function loadRoom(key){
     const dir = new THREE.DirectionalLight(cl.dir, cl.dirI);
     dir.position.set(4, 9, 3);
     for (const l of [amb, hemi, dir]) scene.add(l);
+    devLights = { ambient:amb, hemi, key:dir, fill:null };
 
     roomRoot.traverse(o=>{
       if (!o.isMesh) return;
@@ -890,14 +917,17 @@ async function loadRoom(key){
        supply direction and highlights — a big flat ambient would just
        wash the environment contribution out again. */
     const L = cfg.lights || { ambient:0.3, hemi:0.5, dir:1.2, sky:0xdfe8f5, ground:0x8a8460 };
-    scene.add(new THREE.AmbientLight(0xffffff, L.ambient));
-    scene.add(new THREE.HemisphereLight(L.sky, L.ground, L.hemi));
+    const amb = new THREE.AmbientLight(0xffffff, L.ambient);
+    const hemi = new THREE.HemisphereLight(L.sky, L.ground, L.hemi);
+    scene.add(amb);
+    scene.add(hemi);
     const key = new THREE.DirectionalLight(0xfff4e2, L.dir);
     key.position.set(28, 55, 18);
     scene.add(key);
     const fill = new THREE.DirectionalLight(L.sky, L.dir*0.28);
     fill.position.set(-30, 24, -22);
     scene.add(fill);
+    devLights = { ambient:amb, hemi, key, fill };
   }
   roomUpdate = built && built.update ? built.update : null;
   roomSun = null;
@@ -922,10 +952,16 @@ async function loadRoom(key){
   TUNE.exposure = DEFAULTS.exposure = cfg.exposure ?? 1.0;
   TUNE.charScale = DEFAULTS.charScale = cfg.charScale ?? 1.0;
   TUNE.camDist = DEFAULTS.camDist = cfg.camDist ?? 6.2;
+  TUNE.envIntensity = DEFAULTS.envIntensity = cfg.env?.intensity ?? 1.0;
+  TUNE.ambientIntensity = DEFAULTS.ambientIntensity = devLights.ambient?.intensity ?? 0;
+  TUNE.hemiIntensity = DEFAULTS.hemiIntensity = devLights.hemi?.intensity ?? 0;
+  TUNE.keyIntensity = DEFAULTS.keyIntensity = devLights.key?.intensity ?? 0;
+  TUNE.fillIntensity = DEFAULTS.fillIntensity = devLights.fill?.intensity ?? 0;
   applyCharScale();
   baseFog = cfg.fog || [0x1a1710, 0.012];
   scene.fog = new THREE.FogExp2(baseFog[0], baseFog[1]*TUNE.fogDensity);
   scene.background = new THREE.Color(baseFog[0]);
+  if (document.getElementById('tune').children.length) syncPanel();
 
   setProgress(0.9, 'finding the floor');
   await new Promise(r=>setTimeout(r,0));      // let the loader paint before the blocking pass
@@ -989,6 +1025,7 @@ const COYOTE = 0.12, JUMP_BUFFER = 0.15, RADIUS = 0.34;
    than abandoning the 2.2 s clip halfway through and starting the unrelated
    2.53 s Hard Landing clip at its airborne first frame. */
 const JUMP_TAKEOFF = 0.42, JUMP_CONTACT = 1.58;
+const UAL_TAKEOFF = 0.17, UAL_LAND_RECOVERY = 0.83;
 const pos = new THREE.Vector3(), vel = new THREE.Vector3();
 let vy = 0, grounded = true, heading = Math.PI, coyoteT = 0, jumpBufT = 0;
 let windupT = 0, landT = 0, dancing = false, moonwalking = false;
@@ -1010,6 +1047,26 @@ function setJumpPhase(phase){
   } else if (phase === 'land'){
     a.time = Math.min(JUMP_CONTACT, duration-0.01);
     a.timeScale = Math.max(0.01, duration-JUMP_CONTACT) / Math.max(TUNE.landHold, 0.05);
+  }
+}
+function hasStagedJump(){
+  return !!(actions.Jump_Start && actions.Jump_Loop && actions.Jump_Land);
+}
+function playJumpPhase(phase, fade=0.05){
+  if (!hasStagedJump()){
+    play('Jump', fade);
+    setJumpPhase(phase === 'start' ? 'windup' : phase);
+    return;
+  }
+  const name = phase === 'start' ? 'Jump_Start' : phase === 'air' ? 'Jump_Loop' : 'Jump_Land';
+  play(name, fade);
+  const action = actions[name];
+  if (phase === 'start'){
+    action.timeScale = UAL_TAKEOFF / Math.max(TUNE.jumpWindup, 0.05);
+  } else if (phase === 'air'){
+    action.timeScale = 1;
+  } else {
+    action.timeScale = Math.min(action.getClip().duration, UAL_LAND_RECOVERY) / Math.max(TUNE.landHold, 0.05);
   }
 }
 
@@ -1062,7 +1119,12 @@ function moveWithCollision(dx, dz){
 }
 
 const clock = new THREE.Clock();
-let elapsed = 0, fpsT = 0, frames = 0, frameAvg = 0.016, resTimer = 0;
+let elapsed = 0, frameAvg = 0.016, resTimer = 0;
+/* Physics deliberately caps dt after a stall. FPS must not: measuring the
+   capped value made a 200 ms hitch look like a healthy 20 fps frame. Keep a
+   separate wall-clock window and report both average FPS and slow-frame cost. */
+let perfLastMs = performance.now(), perfWindowMs = perfLastMs, perfFrames = 0;
+const perfFrameTimes = [];
 window.__rooms = { keys, pos, vel, TUNE, THREE, step:()=>tick(),
   get avatar(){return avatar;}, get _actions(){return actions;}, get _mixer(){return mixer;}, get offsets(){return clipGroundOffset;},
   get room(){return roomKey;}, get grid(){return grid;}, get stats(){return roomStats;},
@@ -1081,6 +1143,14 @@ function occludes(x, z){
 }
 
 function tick(){
+  const perfNow = performance.now();
+  const rawFrameMs = perfNow - perfLastMs;
+  perfLastMs = perfNow;
+  if (rawFrameMs > 0 && rawFrameMs < 1000){
+    perfFrameTimes.push(rawFrameMs);
+    if (perfFrameTimes.length > 240) perfFrameTimes.shift();
+  }
+  perfFrames++;
   const dt = Math.min(clock.getDelta(), 0.05);
   elapsed += dt;
   if (!grid) { renderer.render(scene, camera); return; }
@@ -1108,18 +1178,18 @@ function tick(){
   coyoteT = grounded ? COYOTE : Math.max(0, coyoteT-dt);
   if (jumpBufT>0 && coyoteT>0 && windupT<=0 && grounded){
     // The Jump clip starts with the crouch and physical lift-off follows at
-    // the same windup boundary (0.33 s by default).
+    // the same windup boundary. Its vertical root motion is flattened in the
+    // asset, so physics is the single source of the character's height.
     windupT = Math.max(TUNE.jumpWindup, 1e-3);
     jumpBufT = 0; coyoteT = 0; landT = 0;
-    play('Jump',0.05);
-    setJumpPhase('windup');
+    playJumpPhase('start',0.05);
   }
   if (windupT>0){
     windupT -= dt;
     if (windupT<=0){
       vy = TUNE.jumpVel;
       grounded = false;
-      setJumpPhase('air');
+      playJumpPhase('air',0.06);
     }
   }
 
@@ -1130,14 +1200,14 @@ function tick(){
       pos.y = ground; vy = 0; grounded = true; landT = TUNE.landHold;
       // Jump already contains its own matching contact and recovery frames.
       // Continue that performance at the exact moment physics touches down.
-      if (actions.Jump){ play('Jump',0.04); setJumpPhase('land'); }
+      playJumpPhase('land',0.055);
     }
   } else {
     if (pos.y - ground > 0.45){
       grounded = false; vy = 0;
       // Walking off a ledge enters the airborne portion directly: replaying
       // the crouch while already falling looks like a second phantom jump.
-      if (actions.Jump){ play('Jump',0.08); setJumpPhase('air'); }
+      playJumpPhase('air',0.08);
     } else pos.y = ground;
   }
   if (landT>0) landT -= dt;
@@ -1151,8 +1221,9 @@ function tick(){
     avatar.rotation.y += d * Math.min(1, TUNE.turnRate*dt);
 
     if (mixer){
-      if (windupT>0 || !grounded) play('Jump',0.05);
-      else if (landT>0 && actions.Jump) play('Jump',0.04);
+      if (windupT>0) play(hasStagedJump()?'Jump_Start':'Jump',0.05);
+      else if (!grounded) play(hasStagedJump()?'Jump_Loop':'Jump',0.05);
+      else if (landT>0) play(hasStagedJump()?'Jump_Land':'Jump',0.04);
       else if (moonwalking && actions.Moonwalk) play('Moonwalk');
       else if (dancing && actions.Dance) play('Dance');
       else if (hasInput){
@@ -1232,6 +1303,11 @@ function tick(){
   }
   renderer.toneMappingExposure = TUNE.exposure;
   if (scene.fog) scene.fog.density = baseFog[1]*TUNE.fogDensity;
+  scene.environmentIntensity = TUNE.envIntensity;
+  if (devLights.ambient) devLights.ambient.intensity = TUNE.ambientIntensity;
+  if (devLights.hemi) devLights.hemi.intensity = TUNE.hemiIntensity;
+  if (devLights.key) devLights.key.intensity = TUNE.keyIntensity;
+  if (devLights.fill) devLights.fill.intensity = TUNE.fillIntensity;
 
   renderer.render(scene, camera);
 
@@ -1250,11 +1326,16 @@ function tick(){
     }
   }
 
-  frames++; fpsT += dt;
-  if (fpsT>=1){
+  const perfSpan = perfNow - perfWindowMs;
+  if (perfSpan >= 900){
+    const fps = perfFrames * 1000 / perfSpan;
+    const recent = perfFrameTimes.slice().sort((a,b)=>a-b);
+    const avgMs = perfFrameTimes.reduce((sum,v)=>sum+v,0) / Math.max(1,perfFrameTimes.length);
+    const p99Ms = recent[Math.min(recent.length-1, Math.floor(recent.length*.99))] || avgMs;
+    const low = 1000 / Math.max(0.01,p99Ms);
     document.getElementById('perf').textContent =
-      `${Math.round(frames/fpsT)} fps · ${renderer.info.render.calls} calls · ${pixelScale.toFixed(2)}x`;
-    frames=0; fpsT=0;
+      `${fps.toFixed(0)} fps · ${avgMs.toFixed(1)} ms · 1% low ${low.toFixed(0)} · ${renderer.info.render.calls} calls`;
+    perfFrames = 0; perfWindowMs = perfNow;
   }
 }
 
@@ -1343,13 +1424,30 @@ function flashHud(ms = 4200){
 
 /* Room thumbnails.
 
-   Rendered from the room itself the moment it finishes loading, with the
-   character hidden so the card shows the place rather than the player.
-   Cached in localStorage, so a room you've visited keeps its picture and the
-   cards stop being coloured rectangles. */
-const THUMB_KEY = 'sansara.thumbs.v1';
+   Every published room has a bundled first-visit image. Once a room has
+   rendered on this device, a fresh in-world capture replaces that fallback
+   in localStorage, so cards remain representative as the worlds evolve. */
+const DEFAULT_THUMBS = Object.freeze({
+  dune: 'assets/thumbnails/dune.jpg',
+  level0: 'assets/thumbnails/level0.jpg',
+  backrooms: 'assets/thumbnails/backrooms.jpg',
+  lobby: 'assets/thumbnails/lobby.jpg',
+  pool: 'assets/thumbnails/pool.jpg',
+  dreamcore: 'assets/thumbnails/dreamcore.jpg',
+});
+const THUMB_KEY = 'sansara.thumbs.v2';
 let thumbs = {};
 try { thumbs = JSON.parse(localStorage.getItem(THUMB_KEY) || '{}'); } catch(e){ thumbs = {}; }
+const thumbFor = key => thumbs[key] || DEFAULT_THUMBS[key] || null;
+
+// Decode the small card images before the selector opens. Browsers keep the
+// results in their image cache; no layout or paint is held up by this work.
+for (const src of Object.values(DEFAULT_THUMBS)){
+  const image = new Image();
+  image.decoding = 'async';
+  image.src = src;
+  image.decode?.().catch(()=>{});
+}
 
 function captureThumb(key){
   if (!scene || !roomRoot) return;
@@ -1361,9 +1459,9 @@ function captureThumb(key){
   const prevRatio = renderer.getPixelRatio();
   const shotCam = camera.clone();
   shotCam.fov = 58; shotCam.aspect = 186/238; shotCam.updateProjectionMatrix();
-  // Frame the room from just behind and above where the player starts.
-  shotCam.position.set(pos.x + Math.sin(camYaw)*3.4, pos.y + 2.1, pos.z + Math.cos(camYaw)*3.4);
-  shotCam.lookAt(pos.x - Math.sin(camYaw)*8, pos.y + 1.1, pos.z - Math.cos(camYaw)*8);
+  // Use the camera's resolved, collision-safe composition. The old generic
+  // offset could land behind a wall in short rooms (most visibly the pool).
+  shotCam.updateMatrixWorld(true);
 
   const rt = new THREE.WebGLRenderTarget(248, 318, { colorSpace: THREE.SRGBColorSpace });
   renderer.setRenderTarget(rt);
@@ -1392,7 +1490,7 @@ function captureThumb(key){
   } catch(e){ /* quota or tainted canvas: cards fall back to their tint */ }
 }
 
-window.__thumbOf = k => thumbs[k] || null;
+window.__thumbOf = thumbFor;
 
 /* ============================ travel ===========================
    Rooms aren't a menu of files, they're places. Holding Tab lifts you out:
@@ -1404,7 +1502,55 @@ window.__thumbOf = k => thumbs[k] || null;
 const IS_LOCAL = ['localhost','127.0.0.1',''].includes(location.hostname);
 const REDUCE_MOTION = matchMedia('(prefers-reduced-motion: reduce)');
 const roomKeys = ()=>Object.keys(ROOMS).filter(k=>IS_LOCAL || !ROOMS[k].local);
-let travelOpen = false, travelIdx = 0, switching = false;
+let travelOpen = false, travelIdx = 0, switching = false, travelCommitted = false;
+let pointerX = NaN, pointerY = NaN, travelInput = 'keyboard';
+
+/* A tiny synthesized glass chime keeps the selector responsive without
+   shipping another asset. Every gain starts and ends above zero with a short
+   ramp, avoiding clicks; the context is created only from user input. */
+let travelAudio = null, lastMoveSound = 0;
+function audioReady(){
+  const AudioCtx = window.AudioContext || window.webkitAudioContext;
+  if (!AudioCtx) return null;
+  if (!travelAudio){
+    try { travelAudio = new AudioCtx({ latencyHint:'interactive' }); }
+    catch(e){ travelAudio = new AudioCtx(); }
+  }
+  if (travelAudio.state === 'suspended') travelAudio.resume().catch(()=>{});
+  return travelAudio;
+}
+function chimeTone(ctx, frequency, start, duration, peak, type='sine'){
+  const osc = ctx.createOscillator(), gain = ctx.createGain();
+  osc.type = type;
+  osc.frequency.setValueAtTime(frequency, start);
+  gain.gain.setValueAtTime(0.0001, start);
+  gain.gain.exponentialRampToValueAtTime(peak, start + Math.min(.012, duration*.2));
+  gain.gain.exponentialRampToValueAtTime(0.0001, start + duration);
+  osc.connect(gain).connect(ctx.destination);
+  osc.start(start); osc.stop(start + duration + .02);
+}
+function soundMove(){
+  const ctx = audioReady();
+  if (!ctx || ctx.currentTime - lastMoveSound < .045) return;
+  const t = ctx.currentTime + .004;
+  lastMoveSound = t;
+  chimeTone(ctx, 659.25, t, .105, .018, 'sine');
+  chimeTone(ctx, 987.77, t+.012, .075, .007, 'triangle');
+}
+function soundEnter(){
+  const ctx = audioReady();
+  if (!ctx) return;
+  const t = ctx.currentTime + .006;
+  [[392,.032,0],[493.88,.024,.035],[659.25,.018,.075]].forEach(([f,g,d])=>
+    chimeTone(ctx, f, t+d, .42-d*.7, g, 'sine'));
+}
+
+// Remember the last *physical* pointer position while the selector is shut.
+// Layout motion can emit pointer events without movement; those must never
+// steal a keyboard selection back to the card under a stationary cursor.
+addEventListener('pointermove', e=>{
+  if (!travelOpen){ pointerX = e.clientX; pointerY = e.clientY; }
+}, { passive:true });
 
 function tintFor(k){
   return ({ dune:'#e7c78d', level0:'#b3a55c', backrooms:'#e2c98f',
@@ -1415,12 +1561,26 @@ function markSelected(scroll=false){
   cards.forEach((el,i)=>{
     el.classList.toggle('sel', i===travelIdx);
     el.setAttribute('aria-pressed', String(i===travelIdx));
-    if (scroll && i===travelIdx) el.scrollIntoView({ behavior:REDUCE_MOTION.matches?'auto':'smooth', block:'nearest', inline:'center' });
+    if (scroll && i===travelIdx){
+      const rail = document.getElementById('rail');
+      const left = el.offsetLeft - (rail.clientWidth - el.offsetWidth)/2;
+      rail.scrollTo({ left, behavior:REDUCE_MOTION.matches?'auto':'smooth' });
+    }
   });
   const keys = roomKeys(), chosen = keys[travelIdx];
   document.getElementById('travelCount').textContent = chosen
     ? `${String(travelIdx+1).padStart(2,'0')} / ${String(keys.length).padStart(2,'0')}  ·  ${ROOMS[chosen].label}`
     : '';
+}
+function selectTravel(i, {scroll=false, sound=true, source='keyboard'}={}){
+  const count = roomKeys().length;
+  if (!count) return;
+  const next = (i % count + count) % count;
+  if (next === travelIdx) return;
+  travelInput = source;
+  travelIdx = next;
+  markSelected(scroll);
+  if (sound) soundMove();
 }
 function buildTravel(){
   const rail = document.getElementById('rail');
@@ -1433,17 +1593,23 @@ function buildTravel(){
     el.setAttribute('aria-label', `${cfg.label}. ${cfg.blurb || ''}`);
     if (k===roomKey) el.setAttribute('aria-current','true');
     el.style.setProperty('--tint', cfg.tint || tintFor(k));
-    const shot = thumbs[k];
-    el.innerHTML = `<span class="swatch${shot?' shot':''}"${shot?` style="--shot:url(${shot})"`:''}></span>
+    const shot = thumbFor(k);
+    el.innerHTML = `<span class="swatch${shot?' shot':''}"${shot?` style="--shot:url('${shot}')"`:''}></span>
       <span class="veil"></span>
       <span class="idx">${String(i+1).padStart(2,'0')}</span>
       <span class="txt"><span class="nm">${cfg.label}</span>
       <span class="bl">${cfg.blurb || ''}</span></span>`;
-    el.onclick = ()=>{ closeTravel(); goTo(k); };
-    // Use real pointer movement, not mouseenter. When keyboard navigation
-    // scrolls/lifts cards under a stationary cursor, mouseenter can fire from
-    // the layout change and immediately undo the arrow-key selection.
-    el.onpointermove = ()=>{ travelIdx = i; markSelected(); };
+    el.onclick = ()=>commitTravel(k);
+    el.onpointerdown = ()=>{ travelInput = 'pointer'; audioReady(); };
+    el.onpointermove = e=>{
+      if (!Number.isFinite(pointerX)){ pointerX=e.clientX; pointerY=e.clientY; return; }
+      // Keyboard mode deliberately needs a larger physical gesture, so tiny
+      // trackpad jitter cannot steal the highlight immediately after an arrow.
+      const threshold = travelInput === 'keyboard' ? 10 : 2;
+      if (Math.hypot(e.clientX-pointerX, e.clientY-pointerY) <= threshold) return;
+      pointerX = e.clientX; pointerY = e.clientY;
+      selectTravel(i, {source:'pointer'});
+    };
     rail.appendChild(el);
   });
   markSelected();
@@ -1452,6 +1618,8 @@ function openTravel(){
   if (travelOpen || switching) return;
   if (panelShown) showPanel(false);
   travelOpen = true;
+  travelCommitted = false;
+  travelInput = 'keyboard';
   travelIdx = Math.max(0, roomKeys().indexOf(roomKey));
   buildTravel();
   const travel = document.getElementById('travel');
@@ -1465,11 +1633,19 @@ function closeTravel(){
   travel.classList.remove('on');
   travel.setAttribute('aria-hidden','true');
 }
+function commitTravel(k){
+  if (!travelOpen || travelCommitted || switching || !ROOMS[k]) return;
+  travelCommitted = true;
+  closeTravel();
+  if (k === roomKey) return;
+  soundEnter();
+  goTo(k);
+}
 async function goTo(k){
   if (k === roomKey || switching || !ROOMS[k]) return;
   switching = true;
   const wipe = document.getElementById('wipe');
-  const shot = thumbs[k], tint = ROOMS[k].tint || tintFor(k);
+  const shot = thumbFor(k), tint = ROOMS[k].tint || tintFor(k);
   wipe.style.setProperty('--wipe-tint', tint);
   wipe.style.setProperty('--wipe-image', shot
     ? `url("${shot}")`
@@ -1497,25 +1673,33 @@ async function goTo(k){
 }
 
 addEventListener('keydown', e=>{
-  if (e.code === 'Tab'){ e.preventDefault(); openTravel(); return; }
+  if (e.code === 'Tab'){ e.preventDefault(); audioReady(); openTravel(); return; }
   if (!travelOpen) return;
   const ks = roomKeys();
-  if (e.code === 'ArrowRight'){ travelIdx = (travelIdx+1)%ks.length; markSelected(true); e.preventDefault(); }
-  if (e.code === 'ArrowLeft'){ travelIdx = (travelIdx-1+ks.length)%ks.length; markSelected(true); e.preventDefault(); }
+  if (e.code === 'ArrowRight'){ selectTravel(travelIdx+1, {scroll:true}); e.preventDefault(); }
+  if (e.code === 'ArrowLeft'){ selectTravel(travelIdx-1, {scroll:true}); e.preventDefault(); }
   if (e.code === 'Escape'){ closeTravel(); e.preventDefault(); }
-  if (e.code === 'Enter'){ const k = ks[travelIdx]; closeTravel(); goTo(k); e.preventDefault(); }
+  if (e.code === 'Enter'){ commitTravel(ks[travelIdx]); e.preventDefault(); }
 });
 addEventListener('keyup', e=>{
   if (e.code !== 'Tab' || !travelOpen) return;
   const k = roomKeys()[travelIdx];
-  closeTravel();
-  goTo(k);
+  commitTravel(k);
 });
 // Keys must not stay stuck down when focus leaves the page.
 addEventListener('blur', ()=>{
   for (const k in keys) keys[k] = false;
   jumpBufT = 0;
   if (travelOpen) closeTravel();
+});
+addEventListener('visibilitychange', ()=>{
+  // A background tab may be throttled for seconds. Start a clean measurement
+  // on return rather than poisoning the visible FPS window with hidden time.
+  if (!document.hidden){
+    perfLastMs = perfWindowMs = performance.now();
+    perfFrames = 0; perfFrameTimes.length = 0;
+    clock.getDelta();
+  }
 });
 
 let panelShown = false, typed = '';
@@ -1534,26 +1718,63 @@ function tuneSnapshot(){
   return `TUNE {\n${TUNE_SPEC.map(([k])=>`  ${k}: ${TUNE[k]},`).join('\n')}\n}`;
 }
 function syncPanel(){
+  const title = document.getElementById('lookTitle');
+  if (title) title.textContent = `World atmosphere · ${ROOMS[roomKey].label}`;
   document.querySelectorAll('#tune input[type=range]').forEach(i=>{
     i.value = TUNE[i.dataset.key];
     i.parentElement.querySelector('output').textContent = TUNE[i.dataset.key];
   });
+  const colors = {
+    fog: scene?.fog?.color, ambient:devLights.ambient?.color,
+    sky:devLights.hemi?.color, ground:devLights.hemi?.groundColor,
+    key:devLights.key?.color, fill:devLights.fill?.color,
+  };
+  document.querySelectorAll('#tune input[type=color]').forEach(i=>{
+    const c = colors[i.dataset.look];
+    if (c) i.value = '#' + c.getHexString();
+  });
 }
 function buildPanel(){
   const panel = document.getElementById('tune');
+  const worldKeys = new Set(['exposure','fogDensity','envIntensity','ambientIntensity','hemiIntensity','keyIntensity','fillIntensity']);
+  const sliders = specs => specs.map(([k,label,min,max,step])=>`
+      <label><span>${label}</span>
+        <input type="range" min="${min}" max="${max}" step="${step}" value="${TUNE[k]}" data-key="${k}">
+        <output>${TUNE[k]}</output></label>`).join('');
   panel.innerHTML = `<div class="ph"><b>Development</b><button id="tuneToggle" title="press backquote to reopen">×</button></div>
     <div class="pb"><div class="devcam"><b>Camera inspection</b>
       <button id="xrayToggle" type="button" aria-pressed="false">X-ray off</button>
       <small>Press X while this panel is open. Closing Dev Mode restores solid scene occlusion.</small></div>
-      ${TUNE_SPEC.map(([k,label,min,max,step])=>`
-      <label><span>${label}</span>
-        <input type="range" min="${min}" max="${max}" step="${step}" value="${TUNE[k]}" data-key="${k}">
-        <output>${TUNE[k]}</output></label>`).join('')}
+      <div class="psection" id="lookTitle">World atmosphere · ${ROOMS[roomKey].label}</div>
+      <div class="look-colors">
+        <label><span>Fog / backdrop</span><input type="color" data-look="fog"></label>
+        <label><span>Ambient color</span><input type="color" data-look="ambient"></label>
+        <label><span>Sky color</span><input type="color" data-look="sky"></label>
+        <label><span>Ground color</span><input type="color" data-look="ground"></label>
+        <label><span>Key color</span><input type="color" data-look="key"></label>
+        <label><span>Fill color</span><input type="color" data-look="fill"></label>
+      </div>
+      ${sliders(TUNE_SPEC.filter(([k])=>worldKeys.has(k)))}
+      <div class="psection">Movement & camera</div>
+      ${sliders(TUNE_SPEC.filter(([k])=>!worldKeys.has(k)))}
       <div class="pact"><button id="tuneCopy">Copy to clipboard</button>
         <button id="tuneReset">reset</button></div>
       <textarea class="pcopy" id="tuneOut" rows="8" readonly></textarea>
     </div>`;
   panel.addEventListener('input', e=>{
+    const look = e.target.dataset.look;
+    if (look){
+      const c = new THREE.Color(e.target.value);
+      if (look === 'fog'){
+        baseFog[0] = c.getHex();
+        scene.background?.copy(c); scene.fog?.color.copy(c);
+      } else if (look === 'ambient') devLights.ambient?.color.copy(c);
+      else if (look === 'sky') devLights.hemi?.color.copy(c);
+      else if (look === 'ground') devLights.hemi?.groundColor.copy(c);
+      else if (look === 'key') devLights.key?.color.copy(c);
+      else if (look === 'fill') devLights.fill?.color.copy(c);
+      return;
+    }
     const k = e.target.dataset.key; if (!k) return;
     TUNE[k] = parseFloat(e.target.value);
     e.target.parentElement.querySelector('output').textContent = TUNE[k];
@@ -1561,7 +1782,19 @@ function buildPanel(){
   });
   document.getElementById('tuneToggle').onclick = ()=>showPanel(false);
   document.getElementById('xrayToggle').onclick = ()=>setCameraXray(!cameraXray);
-  document.getElementById('tuneReset').onclick = ()=>{ Object.assign(TUNE, DEFAULTS); syncPanel(); };
+  document.getElementById('tuneReset').onclick = ()=>{
+    Object.assign(TUNE, DEFAULTS);
+    const cfg = ROOMS[roomKey], fog = new THREE.Color(cfg.fog?.[0] ?? 0x1a1710);
+    baseFog[0] = fog.getHex(); scene.background?.copy(fog); scene.fog?.color.copy(fog);
+    const lc = cfg.charLight, ll = cfg.lights;
+    devLights.ambient?.color.set(lc?.sky ?? 0xffffff);
+    devLights.hemi?.color.set(lc?.sky ?? ll?.sky ?? 0xffffff);
+    devLights.hemi?.groundColor.set(lc?.ground ?? ll?.ground ?? 0x888888);
+    // `lights.dir` is an intensity, whereas `charLight.dir` is a color.
+    devLights.key?.color.set(lc?.dir ?? 0xfff4e2);
+    devLights.fill?.color.set(lc?.sky ?? ll?.sky ?? 0xffffff);
+    syncPanel();
+  };
   document.getElementById('tuneCopy').onclick = async ()=>{
     const txt = tuneSnapshot(), b = document.getElementById('tuneCopy'), out = document.getElementById('tuneOut');
     let ok = false;

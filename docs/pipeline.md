@@ -48,12 +48,12 @@ re-bound; FBX round-trips frequently lose textures.
 
 ```bash
 python3 scripts/inplace_root_motion.py output/raw.glb \
-  output/minimal-scifi-sikh-animated.glb --flatten-vertical Jump
+  output/minimal-scifi-sikh-animated.glb --flatten-vertical Jump Land
 ```
 
-Horizontal Hips translation is flattened for every clip. `Jump` also has its vertical channel
-flattened, because the controller owns the jump arc — leaving both in place makes the character
-appear to double-jump.
+Horizontal Hips translation is flattened for every clip. `Jump` and `Land` also have their vertical
+channels flattened, because the controller owns the jump arc and floor contact — leaving either
+channel in place makes the character float or double-jump when animation and physics add together.
 
 Verify:
 
@@ -121,7 +121,18 @@ input vector instead, and use measured speed only for `timeScale`.
 
 ## Jump timing
 
-Mixamo's Jump clip crouches before the body leaves the ground. Sampling the Hips vertical curve puts
-takeoff at 0.33 s, apex at 0.57 s. Firing the impulse on keydown desyncs the leap from the
-animation, so the impulse waits out a windup timer while the clip plays. `Hard Landing` then owns the
-pose for `landHold` seconds on touchdown.
+Mixamo's Jump clip crouches before the body leaves the ground. Its authored takeoff pose sits around
+0.42 s, but waiting that long feels unresponsive, so the anticipation is time-compressed into a
+0.12 s windup and the physics impulse fires on that exact boundary. The airborne portion is scaled
+to the controller's calculated flight time, then the same Jump clip continues from its authored
+contact frame through a short 0.24 s recovery. The unrelated `Hard Landing` clip is not blended in.
+
+## Quaternius Universal Animation Library
+
+The downloaded Standard pack contains 43 clips at 30 fps in both root-motion and non-root-motion
+exports. Use `UAL1_Standard.glb` for Sansara: the browser controller owns translation and collision.
+The pack's 65-bone Quaternius rig is not track-name compatible with the avatar's 46-bone Mixamo
+rig, so clips cannot be attached directly in Three.js. A Blender retarget must first calibrate the
+two rest poses and bake the result onto `mixamorig:*` bones; a semantic name map alone visibly
+twists shoulders and limbs. Validate every retarget in the animation viewer before it is merged
+into the production GLB.
