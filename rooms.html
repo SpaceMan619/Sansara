@@ -40,6 +40,9 @@
            text-transform:none; color:rgba(36,48,74,.66); }
   #travel .count{ font:400 13px/1 ui-serif,"Iowan Old Style",Georgia,serif;
            color:rgba(36,48,74,.58); }
+  #travel .release{ position:absolute; bottom:max(28px,6vh); left:max(24px,4vw); z-index:1;
+           font:600 9px/1 system-ui,sans-serif; letter-spacing:.18em; text-transform:uppercase;
+           color:rgba(36,48,74,.42); }
   #travel .rail{ position:relative; z-index:1; display:flex; gap:13px; padding:26px 28px;
                  width:min(1180px,96vw); overflow-x:auto; scrollbar-width:none;
                  scroll-snap-type:x proximity; box-sizing:border-box; }
@@ -292,6 +295,7 @@
 <div id="travel" data-input="keyboard" role="dialog" aria-modal="true" aria-label="Choose another place" aria-hidden="true">
   <video class="travel-video" autoplay muted playsinline loop preload="auto" aria-hidden="true"><source src="assets/video/sansara-tab-pingpong.mp4" type="video/mp4"></video>
   <div class="travel-head"><span class="kicker">press tab to choose your world</span><span class="count" id="travelCount" aria-live="polite"></span></div>
+  <span class="release" aria-label="Sansara release version">v0.4.0</span>
   <div class="rail" id="rail" aria-label="Places"></div>
   <div class="hint">hold tab · ← → to choose · release to travel</div>
 </div>
