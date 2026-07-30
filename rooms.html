@@ -217,12 +217,12 @@ const ROOMS = {
     blurb: 'Tiled, chlorinated, and long since drained of anyone.',
     // Path-traced in Cycles and baked into the textures: true bounce light
     // at zero runtime cost. Rendered unlit so the bake survives intact.
-    baked: true, spawn: [-12, 0],
+    baked: true, spawn: [-9, 0], camYaw: Math.PI/2,
     credit: 'liminal pool room by gatgat — CC Attribution',
     creditUrl: 'https://sketchfab.com/3d-models/liminal-pool-room-13ab767a3b8d409a8a3cf31fff76d62b',
     charLight: { sky:0xcfe0f0, ground:0x5c6a72, dir:0xdfeaf5, amb:0.30, hemi:0.42, dirI:0.45 },
     env: { wall:0x9fb4c0, panel:0xdfeef8, floor:0x5e6d76, intensity:0.85 },
-    fog: [0x222f38, 0.010], exposure: 1.75, charScale: 1.0, camDist: 6.0,
+    fog: [0x2b3a44, 0.009], exposure: 1.15, charScale: 1.0, camDist: 6.0,
   },
   dreamcore: {
     label: 'the hill', file: 'assets/scenes/dreamcore_liminal_space.glb',
@@ -858,7 +858,8 @@ async function loadRoom(key){
 
   if (avatar && !avatar.parent) scene.add(avatar);
   if (blob && !blob.parent) scene.add(blob);
-  camYaw = 0.6; camPitch = 0.16;
+  camYaw = (cfg.camYaw !== undefined) ? cfg.camYaw : 0.6;
+  camPitch = 0.16;
   // Place the camera outright — lerping from the previous room's position
   // means the first frames of a new room are framed from nowhere.
   {
@@ -936,6 +937,16 @@ window.__rooms = { keys, pos, vel, TUNE, THREE, step:()=>tick(),
   probe(){ return { pos:{x:+pos.x.toFixed(2),y:+pos.y.toFixed(2),z:+pos.z.toFixed(2)},
                     ground:+grid.groundAt(pos.x,pos.z,0).toFixed(2), grounded,
                     speed:+Math.hypot(vel.x,vel.z).toFixed(2), action:currentAction }; } };
+
+/* A wall for camera purposes, as opposed to merely un-walkable ground. */
+function occludes(x, z){
+  if (!grid) return false;
+  if (typeof grid.occludes === 'function') return grid.occludes(x, z);
+  if (typeof grid.idx !== 'function' || !grid.blocked || !grid.blocked.length) return false;
+  const k = grid.idx(x, z);
+  if (k < 0) return true;          // outside the room's footprint is behind a wall
+  return grid.blocked[k] === 1;
+}
 
 function tick(){
   const dt = Math.min(clock.getDelta(), 0.05);
@@ -1021,12 +1032,22 @@ function tick(){
 
   /* Camera: pull in when the ideal position would sit inside geometry —
      the grid already knows what's solid, so no raycast needed. */
+  /* March out along the boom and stop at the first solid cell. Testing only
+     the boom's endpoint lets a wall sit between camera and character — the
+     endpoint can be in open space on the far side of it. */
+  /* March out along the boom and stop at the first wall. Testing only the
+     endpoint lets a wall sit between camera and character. "Not walkable"
+     is too strict a test though — the camera rides above head height and may
+     legitimately pass over a ledge or the lip of a pool, so only geometry
+     tall enough to actually block the view counts. */
   let dist = TUNE.camDist;
-  for (let i=0;i<6;i++){
-    const tx = pos.x + Math.sin(camYaw)*Math.cos(camPitch)*dist;
-    const tz = pos.z + Math.cos(camYaw)*Math.cos(camPitch)*dist;
-    if (grid.walkable(tx,tz) || dist < 0.9) break;
-    dist *= 0.75;
+  {
+    const step = Math.max(0.25, (grid.cell || 0.4) * 0.8);
+    const dx = Math.sin(camYaw)*Math.cos(camPitch), dz = Math.cos(camYaw)*Math.cos(camPitch);
+    const MIN = Math.min(1.8, TUNE.camDist);
+    for (let d = MIN; d <= TUNE.camDist; d += step){
+      if (occludes(pos.x + dx*d, pos.z + dz*d)){ dist = Math.max(MIN, d - step); break; }
+    }
   }
   const cx = pos.x + Math.sin(camYaw)*Math.cos(camPitch)*dist;
   const cz = pos.z + Math.cos(camYaw)*Math.cos(camPitch)*dist;

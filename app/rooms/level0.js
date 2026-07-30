@@ -284,6 +284,7 @@ export async function build({ THREE }){
       ceiling: WALL_H,
       groundAt: ()=>0,
       walkable: (x,z)=> !!isOpenAtWorld(x,z),
+      occludes: (x,z)=> !isOpenAtWorld(x,z),
     },
     update(dt, pos){
       flicker += dt;
