@@ -151,7 +151,35 @@ export async function build({ THREE, loadGLB }){
   const TOWN   = 'assets/fantasy-town/Models/GLB format/';
   const NATURE = 'assets/nature/Models/GLTF format/';
   const occupied = [];
+  const solidFootprints = [];
   const SPAWN = new THREE.Vector2(0, 6), SPAWN_CLEAR = 6;
+
+  /* The procedural terrain collider used to know only the edge of the map,
+     so both the player and third-person camera could pass straight through
+     village buildings. Keep lightweight oriented footprints alongside the
+     placements; this is exact enough for navigation and much cheaper than
+     raycasting every instanced house on every frame. */
+  function addFootprint(gltf, p, padding=0){
+    const box = new THREE.Box3().setFromObject(gltf.scene);
+    const size = box.getSize(new THREE.Vector3());
+    const center = box.getCenter(new THREE.Vector3());
+    const c = Math.cos(p.ry), s = Math.sin(p.ry);
+    solidFootprints.push({
+      x: p.x + (center.x*c + center.z*s)*p.s,
+      z: p.z + (-center.x*s + center.z*c)*p.s,
+      hx: Math.max(0.35, size.x*p.s*0.5 + padding),
+      hz: Math.max(0.35, size.z*p.s*0.5 + padding),
+      c, s,
+    });
+  }
+  function hitsStructure(x,z,padding=0){
+    for (const b of solidFootprints){
+      const dx=x-b.x, dz=z-b.z;
+      const lx=b.c*dx-b.s*dz, lz=b.s*dx+b.c*dz;
+      if (Math.abs(lx) <= b.hx+padding && Math.abs(lz) <= b.hz+padding) return true;
+    }
+    return false;
+  }
 
   function sample({count, rMin, rMax, minDist, maxSlope=0.85, scale=[1,1], tries=60}){
     const out = [];
@@ -211,7 +239,9 @@ export async function build({ THREE, loadGLB }){
     loadGLB(NATURE+'path_stone.glb'),
   ]);
 
-  scatter(well, [{x:0, z:0, y:groundAt(0,0)-0.05, ry:0, s:1.35}]);
+  const wellPlacement = {x:0, z:0, y:groundAt(0,0)-0.05, ry:0, s:1.35};
+  scatter(well, [wellPlacement]);
+  addFootprint(well, wellPlacement, 0.12);
   occupied.push({x:0,z:0});
 
   // Houses ring the plaza and face it, so it reads as a settlement.
@@ -229,7 +259,10 @@ export async function build({ THREE, loadGLB }){
       occupied.push({x,z});
     }
   }
-  for (const [g,ps] of placements) scatter(g, ps, true);   // houses cast, ground cover doesn't
+  for (const [g,ps] of placements){
+    scatter(g, ps, true);   // houses cast, ground cover doesn't
+    for (const p of ps) addFootprint(g, p, 0.08);
+  }
 
   scatter(stall,     sample({count:7,  rMin:8,  rMax:13, minDist:4,   scale:[1.7,1.9]}));
   scatter(cart,      sample({count:4,  rMin:9,  rMax:14, minDist:4.5, scale:[1.7,1.9]}));
@@ -258,7 +291,8 @@ export async function build({ THREE, loadGLB }){
     collision: {
       ceiling: null,
       groundAt: (x,z,fb)=> (Math.abs(x)>HALF-2 || Math.abs(z)>HALF-2) ? (fb ?? 0) : groundAt(x,z),
-      walkable: (x,z)=> Math.abs(x) < HALF-8 && Math.abs(z) < HALF-8,
+      walkable: (x,z)=> Math.abs(x) < HALF-8 && Math.abs(z) < HALF-8 && !hitsStructure(x,z,0.12),
+      occludes: (x,z)=> Math.abs(x) >= HALF-8 || Math.abs(z) >= HALF-8 || hitsStructure(x,z,0.04),
     },
   };
 }

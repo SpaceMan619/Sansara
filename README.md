@@ -20,8 +20,10 @@ Then visit <http://localhost:8642/>.
 
 ### Liminal Rooms (`rooms.html`) — the whole thing
 
-Six rooms, one character, one page. Two are built procedurally at load (`app/rooms/*.js`), four are
-artist-made scenes that get collision inferred from their geometry. Hold **Tab** to travel.
+Five published rooms, one character, one page. Two are built procedurally at load
+(`app/rooms/*.js`) and three are artist-made scenes with collision inferred from their geometry.
+A sixth licensed scene is available only in the local build because its model cannot be
+redistributed. Hold **Tab** to travel.
 
 ### 01 — Dune (procedural)
 

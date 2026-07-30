@@ -25,58 +25,91 @@
      world back behind glass and presents them as cards; releasing commits
      to one. The dock is gone: nothing sits on screen while you play. */
   #travel{ position:fixed; inset:0; z-index:5; display:grid; place-items:center;
-           opacity:0; visibility:hidden; pointer-events:none;
-           background:rgba(250,248,244,.55);
-           backdrop-filter:blur(13px) saturate(125%);
-           -webkit-backdrop-filter:blur(13px) saturate(125%);
-           transition:opacity .34s cubic-bezier(.2,.7,.3,1), visibility .34s; }
-  #travel.on{ opacity:1; visibility:visible; }
-  #travel .rail{ display:flex; gap:14px; padding:0 24px; max-width:96vw;
-                 overflow-x:auto; scrollbar-width:none; }
+           opacity:0; visibility:hidden; pointer-events:none; overflow:hidden;
+           background:
+             radial-gradient(circle at 14% 18%, rgba(255,255,255,.94), transparent 34%),
+             radial-gradient(circle at 84% 74%, rgba(168,201,255,.62), transparent 38%),
+             rgba(238,244,255,.76);
+           backdrop-filter:blur(22px) saturate(155%);
+           -webkit-backdrop-filter:blur(22px) saturate(155%);
+           transition:opacity .42s cubic-bezier(.22,.61,.36,1), visibility .42s; }
+  #travel::before, #travel::after{ content:''; position:absolute; border-radius:50%; pointer-events:none;
+           filter:blur(44px); opacity:.72; }
+  #travel::before{ width:48vw; height:48vw; left:-12vw; bottom:-24vw;
+           background:rgba(255,255,255,.88); animation:travelDrift 11s ease-in-out infinite; }
+  #travel::after{ width:42vw; height:42vw; right:-10vw; top:-19vw;
+           background:rgba(127,168,255,.28); animation:travelDrift 14s ease-in-out infinite reverse; }
+  #travel.on{ opacity:1; visibility:visible; pointer-events:auto; }
+  #travel .travel-head{ position:absolute; top:max(34px,7vh); left:50%; transform:translateX(-50%);
+           z-index:1; width:min(1120px,calc(100vw - 48px)); display:flex; align-items:flex-end;
+           justify-content:space-between; color:#24304a; }
+  #travel .kicker{ font:500 10px/1 system-ui,sans-serif; letter-spacing:.28em;
+           text-transform:uppercase; color:rgba(36,48,74,.66); }
+  #travel .count{ font:400 13px/1 ui-serif,"Iowan Old Style",Georgia,serif;
+           color:rgba(36,48,74,.58); }
+  #travel .rail{ position:relative; z-index:1; display:flex; gap:13px; padding:26px 28px;
+                 width:min(1180px,96vw); overflow-x:auto; scrollbar-width:none;
+                 scroll-snap-type:x proximity; box-sizing:border-box; }
+  @media (min-width:980px){ #travel .rail{ justify-content:center; } }
   #travel .rail::-webkit-scrollbar{ display:none; }
-  .card{ position:relative; flex:0 0 auto; width:186px; height:238px; cursor:pointer;
-         border-radius:16px; overflow:hidden; text-align:left;
-         background:rgba(255,255,255,.5); border:1px solid rgba(255,255,255,.7);
-         box-shadow:0 8px 26px rgba(60,52,44,.14);
-         transform:translateY(10px) scale(.965); opacity:0;
+  .card{ position:relative; flex:1 0 168px; min-width:168px; max-width:188px; height:242px;
+         scroll-snap-align:center; cursor:pointer; padding:0;
+         border-radius:24px; overflow:hidden; text-align:left;
+         background:rgba(255,255,255,.48); border:1px solid rgba(255,255,255,.84);
+         box-shadow:0 18px 48px rgba(86,116,170,.13), inset 0 1px rgba(255,255,255,.72);
+         transform:translateY(14px) scale(.965); opacity:0;
          transition:transform .42s cubic-bezier(.2,.7,.3,1), opacity .32s ease,
                     box-shadow .3s ease, border-color .3s ease; }
-  #travel.on .card{ transform:none; opacity:1; }
+  #travel.on .card:not(.sel):not(:hover){ transform:none; opacity:1; }
+  #travel.on .card.sel, #travel.on .card:hover{ opacity:1; }
   #travel .card:nth-child(1){ transition-delay:.02s } #travel .card:nth-child(2){ transition-delay:.05s }
   #travel .card:nth-child(3){ transition-delay:.08s } #travel .card:nth-child(4){ transition-delay:.11s }
   #travel .card:nth-child(5){ transition-delay:.14s } #travel .card:nth-child(6){ transition-delay:.17s }
   .card .swatch{ position:absolute; inset:0; opacity:.9; background-size:cover;
                  background-position:center;
-                 background-image:linear-gradient(165deg, var(--tint) 0%, rgba(255,255,255,.25) 78%); }
+                 background-image:radial-gradient(circle at 35% 24%, rgba(255,255,255,.9), transparent 32%),
+                                  linear-gradient(155deg, var(--tint) 0%, #dbe8ff 100%);
+                 transform:scale(1.03); transition:transform .7s cubic-bezier(.22,.61,.36,1), filter .4s; }
   .card .swatch.shot{ opacity:1; background-image:var(--shot); }
   .card .veil{ position:absolute; inset:0;
-               background:linear-gradient(180deg, rgba(255,255,255,0) 34%, rgba(252,250,246,.94) 100%); }
-  .card .txt{ position:absolute; left:16px; right:16px; bottom:15px; display:block; }
-  .card .nm{ display:block; font:400 19px/1.2 ui-serif,"Iowan Old Style",Georgia,serif;
-             color:#241f1a; text-transform:lowercase; }
-  .card .bl{ display:block; margin-top:6px; font-size:11.5px; line-height:1.42;
-             color:rgba(44,39,34,.6); }
-  .card.here .nm::after{ content:' · here'; font:400 10.5px/1 system-ui,sans-serif;
-                         letter-spacing:.16em; text-transform:uppercase; color:rgba(44,39,34,.4); }
-  .card:hover{ transform:translateY(-3px); box-shadow:0 14px 34px rgba(60,52,44,.18); }
+               background:linear-gradient(180deg, rgba(238,244,255,.02) 22%, rgba(238,244,255,.2) 48%, rgba(248,251,255,.96) 100%); }
+  .card .idx{ position:absolute; top:13px; left:14px; z-index:1; display:grid; place-items:center;
+              width:25px; height:25px; border-radius:50%; color:rgba(36,48,74,.62);
+              background:rgba(255,255,255,.58); border:1px solid rgba(255,255,255,.78);
+              backdrop-filter:blur(10px); font-size:9px; letter-spacing:.08em; }
+  .card .txt{ position:absolute; left:16px; right:16px; bottom:16px; display:block; }
+  .card .nm{ display:block; font:400 20px/1.15 ui-serif,"Iowan Old Style",Georgia,serif;
+             color:#24304a; text-transform:lowercase; }
+  .card .bl{ display:block; margin-top:6px; font-size:10.5px; line-height:1.4;
+             color:rgba(36,48,74,.58); }
+  .card.here .nm::after{ content:'  here'; font:600 8.5px/1 system-ui,sans-serif;
+                         letter-spacing:.18em; text-transform:uppercase; color:#6f91d8; }
+  .card:hover{ transform:translateY(-5px); box-shadow:0 24px 58px rgba(86,116,170,.2); }
+  .card:hover .swatch{ transform:scale(1.075); }
   /* Keyboard selection has to read at a glance and not be confusable with
      hover: the card lifts further, gains a ring, and its name goes dark. */
-  .card.sel{ transform:translateY(-14px) scale(1.035);
-             box-shadow:0 22px 50px rgba(60,52,44,.26),
-                        0 0 0 2px rgba(44,39,34,.72),
-                        0 0 0 6px rgba(255,255,255,.6);
-             border-color:transparent; }
-  .card.sel .nm{ color:#14110d; }
-  .card.sel .bl{ color:rgba(44,39,34,.8); }
-  .card.sel::after{ content:''; position:absolute; left:50%; bottom:-13px; width:22px; height:2px;
-                    transform:translateX(-50%); border-radius:2px; background:rgba(44,39,34,.75); }
-  .card:focus-visible{ outline:2px solid rgba(44,39,34,.6); outline-offset:3px; }
-  #travel .hint{ position:absolute; bottom:34px; left:0; right:0; text-align:center;
+  .card.sel{ transform:translateY(-10px) scale(1.025);
+             box-shadow:0 28px 70px rgba(86,116,170,.24),
+                        0 0 0 2px rgba(127,168,255,.78),
+                        0 0 0 7px rgba(255,255,255,.62);
+             border-color:rgba(255,255,255,.95); }
+  .card.sel .nm{ color:#18233d; }
+  .card.sel .bl{ color:rgba(36,48,74,.72); }
+  .card:focus-visible{ outline:2px solid #7fa8ff; outline-offset:5px; }
+  #travel .hint{ position:absolute; bottom:max(28px,6vh); left:0; right:0; text-align:center;
                  font-size:10.5px; letter-spacing:.24em; text-transform:uppercase;
-                 color:rgba(44,39,34,.45); }
-  @media (max-width:640px){ .card{ width:150px; height:200px; } }
+                 color:rgba(36,48,74,.58); }
+  @keyframes travelDrift{ 50%{ transform:translate3d(7%,-5%,0) scale(1.12); } }
+  @media (max-width:640px){
+    #travel .travel-head{ top:28px; }
+    #travel .rail{ padding:24px; }
+    .card{ flex-basis:154px; min-width:154px; height:214px; border-radius:21px; }
+    .card .bl{ display:none; }
+  }
   @media (prefers-reduced-motion: reduce){
     #travel, .card{ transition-duration:.01ms !important; }
+    .card .swatch{ transition:none !important; }
+    #travel::before, #travel::after{ animation:none; }
   }
 
   #credit{ position:fixed; bottom:14px; left:16px; z-index:3; opacity:.55; font-size:11px;
@@ -104,21 +137,41 @@
                 transition:width .3s cubic-bezier(.4,0,.2,1); }
   #load .pct{ display:none; }
 
-  #wipe{ position:fixed; inset:0; z-index:7; pointer-events:none; opacity:0;
-         transition:opacity .6s cubic-bezier(.4,0,.2,1);
-         background:#fbf9f5; }
-  #wipe.on{ opacity:1; }
-  #wipe i{ position:absolute; border-radius:50%; filter:blur(26px);
-           background:radial-gradient(circle at 40% 40%,
-                     rgba(255,255,255,.98), rgba(247,243,236,.72) 45%, rgba(233,226,214,0) 72%);
-           transform:scale(.35); opacity:0;
-           transition:transform 1.15s cubic-bezier(.22,.61,.36,1), opacity .75s ease; }
-  #wipe.on i{ transform:scale(1.25); opacity:1; }
-  #wipe i:nth-child(1){ left:8%;  top:14%; width:58vw; height:58vw; transition-delay:0s; }
-  #wipe i:nth-child(2){ right:4%; top:30%; width:52vw; height:52vw; transition-delay:.07s; }
-  #wipe i:nth-child(3){ left:26%; bottom:2%; width:64vw; height:64vw; transition-delay:.13s; }
+  #wipe{ position:fixed; inset:0; z-index:9; pointer-events:none; opacity:0; visibility:hidden;
+         overflow:hidden; background:rgba(238,244,255,.96);
+         transition:opacity .65s cubic-bezier(.22,.61,.36,1), visibility .65s; }
+  #wipe.on{ opacity:1; visibility:visible; }
+  #wipe.loading{ z-index:7; }
+  #wipe.reveal{ opacity:0; visibility:hidden; }
+  #wipe .cloud{ position:absolute; border-radius:50%; filter:blur(38px); opacity:0;
+           background:radial-gradient(circle, rgba(255,255,255,.98), rgba(168,201,255,.36) 46%, rgba(219,232,255,0) 72%); }
+  #wipe.on .cloud{ animation:cloudPass 1.35s cubic-bezier(.22,.61,.36,1) both; }
+  #wipe .cloud.c1{ left:-10%; top:-18%; width:66vw; height:66vw; }
+  #wipe .cloud.c2{ right:-13%; bottom:-25%; width:72vw; height:72vw; animation-delay:.08s; }
+  #wipe .aperture{ position:absolute; left:50%; top:50%; width:178px; height:242px;
+           transform:translate(-50%,-50%) scale(.82); opacity:0; overflow:hidden;
+           border-radius:24px; border:1px solid rgba(255,255,255,.9);
+           background-image:var(--wipe-image); background-color:var(--wipe-tint,#dbe8ff);
+           background-size:cover; background-position:center;
+           box-shadow:0 28px 90px rgba(86,116,170,.23); }
+  #wipe.on .aperture{ animation:apertureOpen .82s cubic-bezier(.22,.61,.36,1) both; }
+  #wipe .transition-copy{ position:absolute; left:50%; top:50%; transform:translate(-50%,-50%);
+           display:grid; justify-items:center; gap:8px; color:#24304a; opacity:0; }
+  #wipe.on .transition-copy{ animation:transitionCopy 1.05s .18s ease both; }
+  #wipe .transition-copy span{ font-size:9px; letter-spacing:.3em; text-transform:uppercase;
+           color:rgba(36,48,74,.46); }
+  #wipe .transition-copy b{ font:400 28px/1.1 ui-serif,"Iowan Old Style",Georgia,serif; }
+  @keyframes apertureOpen{
+    0%{ opacity:0; transform:translate(-50%,-46%) scale(.82); filter:blur(5px); }
+    38%{ opacity:.88; transform:translate(-50%,-50%) scale(1); filter:blur(0); }
+    100%{ opacity:.12; transform:translate(-50%,-50%) scale(7.2); filter:blur(8px); border-radius:8px; }
+  }
+  @keyframes cloudPass{ 0%{ opacity:0; transform:scale(.55); } 55%{ opacity:.9; } 100%{ opacity:.42; transform:scale(1.35) translate3d(5%,-4%,0); } }
+  @keyframes transitionCopy{ 0%,22%{ opacity:0; transform:translate(-50%,-42%); } 55%,82%{ opacity:1; transform:translate(-50%,-50%); } 100%{ opacity:.72; transform:translate(-50%,-50%); } }
   @media (prefers-reduced-motion: reduce){
-    #wipe, #wipe i{ transition-duration:.01ms !important; }
+    #wipe{ transition-duration:.18s !important; }
+    #wipe .cloud, #wipe .aperture, #wipe .transition-copy{ animation:none !important; }
+    #wipe.on .transition-copy{ opacity:1; }
   }
   #vig{ position:fixed; inset:0; pointer-events:none; z-index:1;
         background:radial-gradient(ellipse at 50% 48%, rgba(0,0,0,0) 48%,
@@ -141,6 +194,11 @@
   #tune button{ font:inherit; color:#e8e4d8; background:#2a251c; border:1px solid #4a4335;
                 border-radius:6px; padding:4px 9px; cursor:pointer; }
   #tune .pact{ display:flex; gap:6px; margin-top:11px; padding-top:10px; border-top:1px solid #3a352a; }
+  #tune .devcam{ display:grid; grid-template-columns:1fr auto; gap:3px 8px; align-items:center;
+                 margin:3px 0 10px; padding:9px; border:1px solid #3a352a; border-radius:8px;
+                 background:#12100c; }
+  #tune .devcam small{ grid-column:1/-1; color:#9f9888; line-height:1.35; }
+  #tune #xrayToggle[aria-pressed="true"]{ background:#b7761f; border-color:#d79c4a; color:#fff; }
   #tune #tuneCopy{ flex:1; background:#b7761f; border-color:#b7761f; color:#fff8ec; font-weight:600; }
   #tune .pcopy{ display:none; width:100%; margin-top:8px; font:11px ui-monospace,monospace;
                 background:#12100c; color:#e8e4d8; border:1px solid #4a4335; border-radius:6px; padding:6px; }
@@ -153,8 +211,16 @@
 <div id="vig"></div>
 <div id="credit"></div>
 <div id="perf"></div>
-<div id="travel"><div class="rail" id="rail"></div><div class="hint">hold tab · ← → to choose · release to travel</div></div>
-<div id="wipe"><i></i><i></i><i></i></div>
+<div id="travel" role="dialog" aria-modal="true" aria-label="Choose another place" aria-hidden="true">
+  <div class="travel-head"><span class="kicker">between places</span><span class="count" id="travelCount"></span></div>
+  <div class="rail" id="rail" aria-label="Places"></div>
+  <div class="hint">hold tab · ← → to choose · release to travel</div>
+</div>
+<div id="wipe">
+  <i class="cloud c1"></i><i class="cloud c2"></i>
+  <div class="aperture"></div>
+  <div class="transition-copy"><span>entering</span><b id="wipeName">another place</b></div>
+</div>
 <div id="load"><div class="box">
   <canvas id="loadArt" width="264" height="264"></canvas>
   <div class="name" id="loadName">Sansara</div>
@@ -218,11 +284,14 @@ const ROOMS = {
     // Path-traced in Cycles and baked into the textures: true bounce light
     // at zero runtime cost. Rendered unlit so the bake survives intact.
     baked: true, spawn: [-9, 0], camYaw: Math.PI/2,
+    // Keep the water reflective and the ceiling panels emissive. Everything
+    // else is baked diffuse and rendered unlit.
+    liveMaterials: ['Material.005', 'Material.008'],
     credit: 'liminal pool room by gatgat — CC Attribution',
     creditUrl: 'https://sketchfab.com/3d-models/liminal-pool-room-13ab767a3b8d409a8a3cf31fff76d62b',
     charLight: { sky:0xcfe0f0, ground:0x5c6a72, dir:0xdfeaf5, amb:0.30, hemi:0.42, dirI:0.45 },
     env: { wall:0x9fb4c0, panel:0xdfeef8, floor:0x5e6d76, intensity:0.85 },
-    fog: [0x2b3a44, 0.009], exposure: 1.15, charScale: 1.0, camDist: 6.0,
+    fog: [0x26343b, 0.0065], exposure: 0.96, charScale: 1.0, camDist: 6.0,
   },
   dreamcore: {
     label: 'the hill', file: 'assets/scenes/dreamcore_liminal_space.glb',
@@ -789,6 +858,14 @@ async function loadRoom(key){
       if (!o.isMesh) return;
       const ms = Array.isArray(o.material)?o.material:[o.material];
       const next = ms.map(m=>{
+        if (cfg.liveMaterials?.some(name=>m.name === name || m.name.startsWith(name+'.'))){
+          if (m.name.startsWith('Material.008')){
+            m.emissive?.set(0x8ff7ef);
+            m.emissiveIntensity = 1.35;
+            m.toneMapped = false;
+          }
+          return m;
+        }
         if (m.type === 'MeshBasicMaterial') return m;
         const b = new THREE.MeshBasicMaterial({
           map: m.map || null, color: m.color ? m.color.clone() : new THREE.Color(0xffffff),
@@ -854,6 +931,7 @@ async function loadRoom(key){
   setProgress(0.98, 'stepping in');
   const [sx, sz] = grid.findSpawn(cfg.spawn[0], cfg.spawn[1]);
   pos.set(sx, grid.groundAt(sx, sz, box.min.y), sz);
+  cameraAnchorY = pos.y;
   vel.set(0,0,0); vy = 0; grounded = true; windupT = 0; landT = 0;
 
   if (avatar && !avatar.parent) scene.add(avatar);
@@ -888,7 +966,9 @@ async function loadRoom(key){
   buildHud();
   flashHud();
   setProgress(1, 'here');
-  requestAnimationFrame(()=>{ try { captureThumb(key); } catch(e){} });
+  // Not requestAnimationFrame: a backgrounded tab never fires it, so the
+  // room would finish loading without ever capturing its card image.
+  setTimeout(()=>{ try { captureThumb(key); } catch(e){} }, 80);
   setTimeout(hideLoader, 260);
 }
 let roomStats = '';
@@ -899,12 +979,33 @@ const pos = new THREE.Vector3(), vel = new THREE.Vector3();
 let vy = 0, grounded = true, heading = Math.PI, coyoteT = 0, jumpBufT = 0;
 let windupT = 0, landT = 0, dancing = false, moonwalking = false;
 let camYaw = 0.6, camPitch = 0.22, dragging = false, px = 0, py = 0;
+let cameraAnchorY = 0, cameraXray = false;
 const keys = {};
 
 addEventListener('keydown', e=>{
   if (e.metaKey||e.ctrlKey||e.altKey) return;
+  if (e.code==='Backquote'){
+    e.preventDefault();
+    if (!e.repeat) showPanel(!panelShown);
+    return;
+  }
+  if (e.code==='KeyX' && panelShown){
+    e.preventDefault();
+    if (!e.repeat) setCameraXray(!cameraXray);
+    return;
+  }
+  const firstPress = !keys[e.code];
   keys[e.code] = true;
-  if (e.code==='Space') e.preventDefault();
+  if (e.code==='Space'){
+    e.preventDefault();
+    // Queue one jump per physical press. Refreshing this in tick() made a
+    // held key survive the landing and immediately launch another jump.
+    if (firstPress && !e.repeat) jumpBufT = JUMP_BUFFER;
+    return;
+  }
+  // Movement remains held in `keys`, but one-shot controls must not toggle
+  // repeatedly when the operating system starts key repeat.
+  if (e.repeat) return;
   if (e.code==='KeyF'){ dancing = !dancing; moonwalking = false; }
   if (e.code==='KeyM'){ moonwalking = !moonwalking; dancing = false; }
   if (e.key==='Escape' && panelShown){ showPanel(false); return; }
@@ -972,10 +1073,14 @@ function tick(){
   vel.z += THREE.MathUtils.clamp(target.z-vel.z, -rate, rate);
   moveWithCollision(vel.x*dt, vel.z*dt);
 
-  if (keys['Space']) jumpBufT = JUMP_BUFFER; else jumpBufT = Math.max(0, jumpBufT-dt);
+  jumpBufT = Math.max(0, jumpBufT-dt);
   coyoteT = grounded ? COYOTE : Math.max(0, coyoteT-dt);
   if (jumpBufT>0 && coyoteT>0 && windupT<=0 && grounded){
-    windupT = Math.max(TUNE.jumpWindup, 1e-3); jumpBufT=0; coyoteT=0; play('Jump',0.05);
+    // The Jump clip starts with the crouch and physical lift-off follows at
+    // the same windup boundary (0.33 s by default).
+    windupT = Math.max(TUNE.jumpWindup, 1e-3);
+    jumpBufT = 0; coyoteT = 0; landT = 0;
+    play('Jump',0.05);
   }
   if (windupT>0){ windupT -= dt; if (windupT<=0){ vy = TUNE.jumpVel; grounded = false; } }
 
@@ -1041,23 +1146,35 @@ function tick(){
      legitimately pass over a ledge or the lip of a pool, so only geometry
      tall enough to actually block the view counts. */
   let dist = TUNE.camDist;
-  {
+  if (!cameraXray){
     const step = Math.max(0.25, (grid.cell || 0.4) * 0.8);
     const dx = Math.sin(camYaw)*Math.cos(camPitch), dz = Math.cos(camYaw)*Math.cos(camPitch);
-    const MIN = Math.min(1.8, TUNE.camDist);
+    const MIN = Math.min(0.72, TUNE.camDist);
+    // Give the camera a little width: testing only its centre lets thin
+    // corners clip through the edge of the frame while orbiting a wall.
+    const shoulder = 0.26, sideX = dz*shoulder, sideZ = -dx*shoulder;
     for (let d = MIN; d <= TUNE.camDist; d += step){
-      if (occludes(pos.x + dx*d, pos.z + dz*d)){ dist = Math.max(MIN, d - step); break; }
+      const x = pos.x + dx*d, z = pos.z + dz*d;
+      if (occludes(x,z) || occludes(x+sideX,z+sideZ) || occludes(x-sideX,z-sideZ)){
+        dist = Math.max(MIN, d - step);
+        break;
+      }
     }
   }
+  /* Follow the ground/jump height through a separate damped anchor. Feeding
+     the raw player Y into both the boom and look-at point made every small
+     terrain sample read as camera bob, even though the avatar was stable. */
+  const anchorRate = grounded ? 7.5 : 4.0;
+  cameraAnchorY += (pos.y - cameraAnchorY) * (1 - Math.exp(-anchorRate*dt));
   const cx = pos.x + Math.sin(camYaw)*Math.cos(camPitch)*dist;
   const cz = pos.z + Math.cos(camYaw)*Math.cos(camPitch)*dist;
-  let cy = pos.y + TUNE.camHeight + Math.sin(camPitch)*dist;
+  let cy = cameraAnchorY + TUNE.camHeight + Math.sin(camPitch)*dist;
   // Indoors the boom would otherwise rise straight through the ceiling and
   // look down on the level from outside it.
-  if (grid.ceiling !== null && grid.ceiling !== undefined)
+  if (!cameraXray && grid.ceiling !== null && grid.ceiling !== undefined)
     cy = Math.min(cy, grid.ceiling - 0.28);
   camera.position.lerp(new THREE.Vector3(cx,cy,cz), Math.min(1,14*dt));
-  camera.lookAt(pos.x, pos.y+1.2, pos.z);
+  camera.lookAt(pos.x, cameraAnchorY+1.2, pos.z);
 
   if (roomUpdate) roomUpdate(dt, pos);
   if (roomSun){
@@ -1166,7 +1283,8 @@ function buildHud(){
      <span><b>shift</b> run</span><i class="sep"></i>
      <span><b>space</b> jump</span><i class="sep"></i>
      <span><b>tab</b> travel</span><i class="sep"></i>
-     <span><b>drag</b> look</span>`;
+     <span><b>drag</b> look</span><i class="sep"></i>
+     <span><b>\`</b> dev</span>`;
 }
 function flashHud(ms = 4200){
   const hud = document.getElementById('hud');
@@ -1199,20 +1317,20 @@ function captureThumb(key){
   shotCam.position.set(pos.x + Math.sin(camYaw)*3.4, pos.y + 2.1, pos.z + Math.cos(camYaw)*3.4);
   shotCam.lookAt(pos.x - Math.sin(camYaw)*8, pos.y + 1.1, pos.z - Math.cos(camYaw)*8);
 
-  const rt = new THREE.WebGLRenderTarget(372, 476, { colorSpace: THREE.SRGBColorSpace });
+  const rt = new THREE.WebGLRenderTarget(248, 318, { colorSpace: THREE.SRGBColorSpace });
   renderer.setRenderTarget(rt);
   renderer.render(scene, shotCam);
   renderer.setRenderTarget(null);
 
-  const buf = new Uint8Array(372*476*4);
-  renderer.readRenderTargetPixels(rt, 0, 0, 372, 476, buf);
-  const cv = document.createElement('canvas'); cv.width = 372; cv.height = 476;
+  const buf = new Uint8Array(248*318*4);
+  renderer.readRenderTargetPixels(rt, 0, 0, 248, 318, buf);
+  const cv = document.createElement('canvas'); cv.width = 248; cv.height = 318;
   const ctx = cv.getContext('2d');
-  const img = ctx.createImageData(372, 476);
+  const img = ctx.createImageData(248, 318);
   // readRenderTargetPixels hands back bottom-up rows
-  for (let y=0;y<476;y++){
-    const src = (475-y)*372*4, dst = y*372*4;
-    img.data.set(buf.subarray(src, src+372*4), dst);
+  for (let y=0;y<318;y++){
+    const src = (317-y)*248*4, dst = y*248*4;
+    img.data.set(buf.subarray(src, src+248*4), dst);
   }
   ctx.putImageData(img,0,0);
   rt.dispose();
@@ -1221,10 +1339,12 @@ function captureThumb(key){
   if (blob) blob.visible = blobVisible;
 
   try {
-    thumbs[key] = cv.toDataURL('image/jpeg', 0.62);
+    thumbs[key] = cv.toDataURL('image/jpeg', 0.5);
     localStorage.setItem(THUMB_KEY, JSON.stringify(thumbs));
   } catch(e){ /* quota or tainted canvas: cards fall back to their tint */ }
 }
+
+window.__thumbOf = k => thumbs[k] || null;
 
 /* ============================ travel ===========================
    Rooms aren't a menu of files, they're places. Holding Tab lifts you out:
@@ -1234,6 +1354,7 @@ function captureThumb(key){
 /* One scene is licensed for use but not for redistribution, so it's absent
    from the published build and present when running locally. */
 const IS_LOCAL = ['localhost','127.0.0.1',''].includes(location.hostname);
+const REDUCE_MOTION = matchMedia('(prefers-reduced-motion: reduce)');
 const roomKeys = ()=>Object.keys(ROOMS).filter(k=>IS_LOCAL || !ROOMS[k].local);
 let travelOpen = false, travelIdx = 0, switching = false;
 
@@ -1241,8 +1362,17 @@ function tintFor(k){
   return ({ dune:'#e7c78d', level0:'#b3a55c', backrooms:'#e2c98f',
             lobby:'#d9b98a', pool:'#bcd6e2', dreamcore:'#b9c8a6' })[k] || '#ddd6c8';
 }
-function markSelected(){
-  document.querySelectorAll('#rail .card').forEach((el,i)=>el.classList.toggle('sel', i===travelIdx));
+function markSelected(scroll=false){
+  const cards = document.querySelectorAll('#rail .card');
+  cards.forEach((el,i)=>{
+    el.classList.toggle('sel', i===travelIdx);
+    el.setAttribute('aria-pressed', String(i===travelIdx));
+    if (scroll && i===travelIdx) el.scrollIntoView({ behavior:REDUCE_MOTION.matches?'auto':'smooth', block:'nearest', inline:'center' });
+  });
+  const keys = roomKeys(), chosen = keys[travelIdx];
+  document.getElementById('travelCount').textContent = chosen
+    ? `${String(travelIdx+1).padStart(2,'0')} / ${String(keys.length).padStart(2,'0')}  ·  ${ROOMS[chosen].label}`
+    : '';
 }
 function buildTravel(){
   const rail = document.getElementById('rail');
@@ -1250,50 +1380,77 @@ function buildTravel(){
   roomKeys().forEach((k,i)=>{
     const cfg = ROOMS[k];
     const el = document.createElement('button');
+    el.type = 'button';
     el.className = 'card' + (k===roomKey ? ' here' : '') + (i===travelIdx ? ' sel' : '');
+    el.setAttribute('aria-label', `${cfg.label}. ${cfg.blurb || ''}`);
+    if (k===roomKey) el.setAttribute('aria-current','true');
     el.style.setProperty('--tint', cfg.tint || tintFor(k));
     const shot = thumbs[k];
     el.innerHTML = `<span class="swatch${shot?' shot':''}"${shot?` style="--shot:url(${shot})"`:''}></span>
       <span class="veil"></span>
+      <span class="idx">${String(i+1).padStart(2,'0')}</span>
       <span class="txt"><span class="nm">${cfg.label}</span>
       <span class="bl">${cfg.blurb || ''}</span></span>`;
     el.onclick = ()=>{ closeTravel(); goTo(k); };
     el.onmouseenter = ()=>{ travelIdx = i; markSelected(); };
     rail.appendChild(el);
   });
+  markSelected();
 }
 function openTravel(){
   if (travelOpen || switching) return;
+  if (panelShown) showPanel(false);
   travelOpen = true;
   travelIdx = Math.max(0, roomKeys().indexOf(roomKey));
   buildTravel();
-  document.getElementById('travel').classList.add('on');
+  const travel = document.getElementById('travel');
+  travel.classList.add('on');
+  travel.setAttribute('aria-hidden','false');
   document.getElementById('hud').classList.remove('show');
 }
 function closeTravel(){
   travelOpen = false;
-  document.getElementById('travel').classList.remove('on');
+  const travel = document.getElementById('travel');
+  travel.classList.remove('on');
+  travel.setAttribute('aria-hidden','true');
 }
 async function goTo(k){
   if (k === roomKey || switching || !ROOMS[k]) return;
   switching = true;
   const wipe = document.getElementById('wipe');
+  const shot = thumbs[k], tint = ROOMS[k].tint || tintFor(k);
+  wipe.style.setProperty('--wipe-tint', tint);
+  wipe.style.setProperty('--wipe-image', shot
+    ? `url("${shot}")`
+    : `radial-gradient(circle at 35% 24%, rgba(255,255,255,.95), transparent 34%), linear-gradient(155deg, ${tint}, #dbe8ff)`);
+  document.getElementById('wipeName').textContent = ROOMS[k].label;
+  wipe.classList.remove('reveal');
+  // Restart the aperture animation even when two changes happen quickly.
+  void wipe.offsetWidth;
   wipe.classList.add('on');
-  await new Promise(r=>setTimeout(r, 620));
-  roomKey = k;
-  history.replaceState(null,'',`?room=${k}`);
-  await loadRoom(k);
-  wipe.classList.remove('on');
-  switching = false;
-  flashHud(2600);
+  try {
+    await new Promise(r=>setTimeout(r, REDUCE_MOTION.matches ? 40 : 760));
+    // The aperture owns the hand-off; the existing loader then owns long
+    // downloads and collision work, so progress never disappears behind it.
+    wipe.classList.add('loading');
+    roomKey = k;
+    history.replaceState(null,'',`?room=${k}`);
+    await loadRoom(k);
+    wipe.classList.add('reveal');
+    await new Promise(r=>setTimeout(r, REDUCE_MOTION.matches ? 60 : 720));
+    flashHud(2600);
+  } finally {
+    wipe.classList.remove('on','reveal','loading');
+    switching = false;
+  }
 }
 
 addEventListener('keydown', e=>{
   if (e.code === 'Tab'){ e.preventDefault(); openTravel(); return; }
   if (!travelOpen) return;
   const ks = roomKeys();
-  if (e.code === 'ArrowRight'){ travelIdx = (travelIdx+1)%ks.length; markSelected(); e.preventDefault(); }
-  if (e.code === 'ArrowLeft'){ travelIdx = (travelIdx-1+ks.length)%ks.length; markSelected(); e.preventDefault(); }
+  if (e.code === 'ArrowRight'){ travelIdx = (travelIdx+1)%ks.length; markSelected(true); e.preventDefault(); }
+  if (e.code === 'ArrowLeft'){ travelIdx = (travelIdx-1+ks.length)%ks.length; markSelected(true); e.preventDefault(); }
   if (e.code === 'Escape'){ closeTravel(); e.preventDefault(); }
   if (e.code === 'Enter'){ const k = ks[travelIdx]; closeTravel(); goTo(k); e.preventDefault(); }
 });
@@ -1304,10 +1461,24 @@ addEventListener('keyup', e=>{
   goTo(k);
 });
 // Keys must not stay stuck down when focus leaves the page.
-addEventListener('blur', ()=>{ for (const k in keys) keys[k] = false; });
+addEventListener('blur', ()=>{
+  for (const k in keys) keys[k] = false;
+  jumpBufT = 0;
+  if (travelOpen) closeTravel();
+});
 
 let panelShown = false, typed = '';
-function showPanel(on){ panelShown = on; document.getElementById('tune').classList.toggle('shown', on); }
+function setCameraXray(on){
+  // X-ray is a development inspection aid, never a normal camera state.
+  cameraXray = !!on && panelShown;
+  const b = document.getElementById('xrayToggle');
+  if (b){ b.setAttribute('aria-pressed', String(cameraXray)); b.textContent = cameraXray ? 'X-ray on' : 'X-ray off'; }
+}
+function showPanel(on){
+  panelShown = on;
+  document.getElementById('tune').classList.toggle('shown', on);
+  if (!on) setCameraXray(false);
+}
 function tuneSnapshot(){
   return `TUNE {\n${TUNE_SPEC.map(([k])=>`  ${k}: ${TUNE[k]},`).join('\n')}\n}`;
 }
@@ -1319,8 +1490,11 @@ function syncPanel(){
 }
 function buildPanel(){
   const panel = document.getElementById('tune');
-  panel.innerHTML = `<div class="ph"><b>Tuning</b><button id="tuneToggle" title="type dev to reopen">×</button></div>
-    <div class="pb">${TUNE_SPEC.map(([k,label,min,max,step])=>`
+  panel.innerHTML = `<div class="ph"><b>Development</b><button id="tuneToggle" title="press backquote to reopen">×</button></div>
+    <div class="pb"><div class="devcam"><b>Camera inspection</b>
+      <button id="xrayToggle" type="button" aria-pressed="false">X-ray off</button>
+      <small>Press X while this panel is open. Closing Dev Mode restores solid scene occlusion.</small></div>
+      ${TUNE_SPEC.map(([k,label,min,max,step])=>`
       <label><span>${label}</span>
         <input type="range" min="${min}" max="${max}" step="${step}" value="${TUNE[k]}" data-key="${k}">
         <output>${TUNE[k]}</output></label>`).join('')}
@@ -1335,6 +1509,7 @@ function buildPanel(){
     if (k === 'charScale') applyCharScale();
   });
   document.getElementById('tuneToggle').onclick = ()=>showPanel(false);
+  document.getElementById('xrayToggle').onclick = ()=>setCameraXray(!cameraXray);
   document.getElementById('tuneReset').onclick = ()=>{ Object.assign(TUNE, DEFAULTS); syncPanel(); };
   document.getElementById('tuneCopy').onclick = async ()=>{
     const txt = tuneSnapshot(), b = document.getElementById('tuneCopy'), out = document.getElementById('tuneOut');

@@ -50,6 +50,7 @@ controls.target.set(0, 0.9, 0);
 
 const clock = new THREE.Clock();
 let mixer, actions = {}, current;
+const fadingOut = new Map();
 
 new GLTFLoader().load('./output/minimal-scifi-sikh-animated.glb', (gltf) => {
   scene.add(gltf.scene);
@@ -71,8 +72,20 @@ new GLTFLoader().load('./output/minimal-scifi-sikh-animated.glb', (gltf) => {
 
 function play(name) {
   if (!name || !actions[name]) return;
-  if (current) actions[current].fadeOut(0.25);
-  actions[name].reset().fadeIn(0.25).play();
+  const next = actions[name], prev = current ? actions[current] : null;
+  next.enabled = true;
+  next.setEffectiveWeight(1);
+  next.reset().play();
+  fadingOut.delete(next);
+  if (prev && prev !== next) {
+    next.crossFadeFrom(prev, 0.25, false);
+    fadingOut.set(prev, performance.now() + 370);
+  }
+  for (const action of Object.values(actions)) {
+    if (action === next || action === prev) continue;
+    if (action.isRunning() || action.getEffectiveWeight() > 0.001)
+      fadingOut.set(action, performance.now() + 370);
+  }
   current = name;
   document.querySelectorAll('#ui button').forEach(b =>
     b.classList.toggle('active', b.textContent === name));
@@ -86,6 +99,14 @@ addEventListener('resize', () => {
 
 renderer.setAnimationLoop(() => {
   mixer?.update(clock.getDelta());
+  const now = performance.now();
+  for (const [action, deadline] of fadingOut) {
+    if (now < deadline && action.getEffectiveWeight() >= 0.005) continue;
+    action.stop();
+    action.enabled = false;
+    action.setEffectiveWeight(0);
+    fadingOut.delete(action);
+  }
   controls.update();
   renderer.render(scene, camera);
 });
