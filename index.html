@@ -14,7 +14,7 @@
     --sans:Inter,Avenir,"Avenir Next",ui-sans-serif,system-ui,-apple-system,sans-serif;
   }
   *{box-sizing:border-box}
-  html{scroll-behavior:smooth;background:var(--dark)}
+  html{scroll-behavior:smooth;background:#eef2f5}
   body{margin:0;background:#eef2f5;color:#1b2a3e;font:400 15px/1.55 var(--sans);overflow-x:hidden}
   a{color:inherit} button,a{-webkit-tap-highlight-color:transparent}
   :focus-visible{outline:2px solid #fff;outline-offset:5px}
@@ -35,7 +35,7 @@
   .nav-link:hover{color:var(--blue);border-color:var(--blue)}
   .hero-copy{align-self:center;width:min(1080px,94vw);margin:1vh 0 0;opacity:0;animation:heroIn 1s .15s cubic-bezier(.2,.72,.2,1) forwards}
   .eyebrow{margin:0 0 24px;font:500 10px/1 var(--sans);letter-spacing:.34em;text-transform:uppercase;color:rgba(245,247,250,.7)}
-  h1{display:block;margin:0;padding-top:.08em;white-space:nowrap;font:400 clamp(58px,13.2vw,180px)/.88 var(--script);letter-spacing:-.08em;color:#fff;text-shadow:0 14px 48px rgba(0,0,0,.2)}
+  h1{display:block;overflow:visible;margin:0;padding-top:.1em;padding-right:.1em;white-space:nowrap;font:400 clamp(56px,12vw,160px)/.92 var(--script);letter-spacing:-.06em;color:#fff;text-shadow:0 14px 48px rgba(0,0,0,.2)}
   .lede{max-width:560px;min-height:2.4em;margin:40px 0 0;font:400 clamp(19px,2.1vw,27px)/1.18 var(--serif);color:rgba(245,247,250,.9);transition:opacity .38s ease,filter .38s ease,transform .38s ease}
   .lede.fade{opacity:0;filter:blur(5px);transform:translateY(5px)}
   .enter{display:inline-flex;align-items:center;gap:16px;margin-top:32px;padding:14px 18px 14px 21px;border:1px solid rgba(255,255,255,.64);
@@ -72,7 +72,8 @@
   .footer-inner a{text-underline-offset:3px}
   .footer-inner details{font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:rgba(43,63,86,.58)}
   .footer-inner summary{cursor:pointer}.footer-inner details span{margin-left:12px;letter-spacing:.04em;text-transform:none}
-  .fine{width:min(1180px,100%);margin:20px auto 0;padding-top:15px;border-top:1px solid rgba(43,63,86,.15);font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:rgba(43,63,86,.55)}
+  .fine{width:min(1180px,100%);margin:20px auto 0;padding-top:15px;border-top:1px solid rgba(43,63,86,.15);text-align:center;font-size:10px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:rgba(43,63,86,.68)}
+  .fine a{text-decoration:none}.fine a:hover{text-decoration:underline;text-underline-offset:4px}
   .page-wipe{position:fixed;z-index:50;inset:0;background:#0b1421;opacity:0;visibility:hidden;pointer-events:none;transition:opacity .45s,visibility .45s}
   .page-wipe.on{opacity:1;visibility:visible}
   .reveal{opacity:0;transform:translateY(18px);transition:opacity .8s ease,transform .9s cubic-bezier(.2,.7,.2,1)}
@@ -117,7 +118,7 @@
 
 <footer>
   <div class="footer-inner"><span>Sansara · an ongoing 3D experiment</span><details><summary>Credits</summary><span>Video by <a href="https://www.youtube.com/watch?v=e1AHGiHaeJc" target="_blank" rel="noopener">Gasendra Jr.</a></span></details></div>
-  <div class="fine">A Project Future Initiative</div>
+  <div class="fine"><a href="https://projectfuture.co.za" target="_blank" rel="noopener">A Project Future Initiative</a></div>
 </footer>
 
 <script>
