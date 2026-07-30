@@ -56,7 +56,27 @@ A procedurally carved office maze with 7.5 m ceilings, walked by the same rigged
   real point lights follows the player so only nearby fixtures cost anything. One of them buzzes.
 - **Collision** — axis-separated grid checks, so you slide along walls instead of sticking to them.
 
-### 03 — Animation viewer (`viewer.html`)
+### 03 — Liminal Rooms (`rooms.html`)
+
+Four artist-made scenes made walkable with the same rigged character, switchable in-page.
+
+- **Baked vs lit** — pre-lit scenes are forced to unlit materials, which reproduces the artist's
+  light exactly and skips lighting math entirely. Adding real lights on top of baked light gives you
+  two sets of shadows and washes the result out. Because an unlit room ignores lights, ordinary
+  lights can be added for the character alone — no layer masking needed.
+- **Inferred collision** — none of these scenes ship collision data, so it's rasterised from the
+  triangles at load: horizontal faces become floor heights, vertical faces become blockers wherever
+  they cross knee-to-head height. Runtime cost is an array lookup, not a raycast against 350k
+  triangles.
+- **Dominant floor detection** — a histogram of surface heights picks the level covering the most
+  area, and each cell takes the surface nearest it. Taking the lowest face instead puts the player
+  at the bottom of the pool rather than on the deck around it.
+- **Grounding in baked rooms** — a baked scene can't receive a real shadow, so a soft blob under the
+  feet keeps the character from looking pasted on.
+
+Heaviest scene runs 62 fps at 8 draw calls on 346k triangles.
+
+### 04 — Animation viewer (`viewer.html`)
 
 A minimal page for stepping through each animation clip on the rigged character in isolation.
 
@@ -92,6 +112,8 @@ Full commands are in [docs/pipeline.md](docs/pipeline.md).
 
 - **Environment art** — [Kenney](https://kenney.nl) Fantasy Town Kit and Nature Kit, both CC0.
   Original license files are kept alongside the models in `assets/`.
+- **Backrooms VR** scene by [carlcapu9](https://sketchfab.com/carlcapu9), licensed
+  **CC Attribution** — used in the Liminal Rooms experiment.
 - **Character mesh** — generated with [mint.gg](https://mint.gg).
 - **Animation clips** — [Mixamo](https://www.mixamo.com) (Adobe).
 - **Engine** — [Three.js](https://threejs.org).

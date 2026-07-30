@@ -1,0 +1,718 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Liminal Rooms — Sansara</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  body{ margin:0; background:#0b0a08; overflow:hidden; color:#e8e4d8;
+        font:13px/1.5 system-ui,-apple-system,sans-serif; }
+  #hud{ position:fixed; top:12px; left:12px; z-index:4; display:flex; gap:8px; align-items:center;
+        background:#1a1712cc; backdrop-filter:blur(8px); border:1px solid #3a352a;
+        padding:8px 10px; border-radius:11px; flex-wrap:wrap; max-width:min(92vw,860px); }
+  #hud .keys{ opacity:.75; } #hud b{ color:#e8c98a; }
+  #hud a{ color:#e8c98a; text-decoration:none; border-bottom:1px solid #e8c98a66; }
+  .roomBtn{ font:inherit; color:#e8e4d8; background:#2a251c; border:1px solid #4a4335;
+            border-radius:7px; padding:4px 10px; cursor:pointer; }
+  .roomBtn:hover{ background:#38311f; }
+  .roomBtn.active{ background:#b7761f; border-color:#b7761f; color:#fff8ec; font-weight:600; }
+  #credit{ position:fixed; bottom:12px; left:12px; z-index:4; opacity:.7; font-size:11.5px;
+           max-width:60vw; }
+  #credit a{ color:#e8c98a; }
+  #perf{ position:fixed; bottom:12px; right:12px; z-index:4; opacity:.65;
+          font-variant-numeric:tabular-nums; font-size:11.5px; }
+  #load{ position:fixed; inset:0; display:grid; place-items:center; z-index:5;
+         background:#0b0a08; transition:opacity .4s; font-size:14px; letter-spacing:.04em; }
+  #load.hide{ opacity:0; pointer-events:none; }
+  #vig{ position:fixed; inset:0; pointer-events:none; z-index:1;
+        background:radial-gradient(ellipse at 50% 48%, rgba(0,0,0,0) 48%,
+                   rgba(0,0,0,0.18) 82%, rgba(0,0,0,0.42) 100%); }
+  /* dev-only tuning panel — same `dev` unlock as the dune world */
+  #tune{ position:fixed; top:12px; right:12px; z-index:6; width:236px;
+         background:#1a1712f2; backdrop-filter:blur(8px); border:1px solid #4a4335;
+         border-radius:12px; font-size:12px; overflow:hidden;
+         opacity:0; visibility:hidden; transform:translateY(-8px) scale(.985);
+         transition:opacity .3s, transform .3s, visibility .3s linear; }
+  #tune.shown{ opacity:1; visibility:visible; transform:none; }
+  #tune .ph{ display:flex; justify-content:space-between; align-items:center;
+             padding:8px 10px; border-bottom:1px solid #3a352a; }
+  #tune .pb{ padding:8px 10px 10px; max-height:72vh; overflow-y:auto; }
+  #tune label{ display:grid; grid-template-columns:1fr 38px; gap:2px 6px; margin-bottom:7px;
+               align-items:center; }
+  #tune label span{ opacity:.75; }
+  #tune output{ text-align:right; font-weight:600; font-variant-numeric:tabular-nums; }
+  #tune input[type=range]{ grid-column:1/-1; width:100%; height:14px; margin:0; accent-color:#b7761f; }
+  #tune button{ font:inherit; color:#e8e4d8; background:#2a251c; border:1px solid #4a4335;
+                border-radius:6px; padding:4px 9px; cursor:pointer; }
+  #tune .pact{ display:flex; gap:6px; margin-top:11px; padding-top:10px; border-top:1px solid #3a352a; }
+  #tune #tuneCopy{ flex:1; background:#b7761f; border-color:#b7761f; color:#fff8ec; font-weight:600; }
+  #tune .pcopy{ display:none; width:100%; margin-top:8px; font:11px ui-monospace,monospace;
+                background:#12100c; color:#e8e4d8; border:1px solid #4a4335; border-radius:6px; padding:6px; }
+  @media (max-width:760px){ #tune{ display:none; } }
+</style>
+</head>
+<body>
+<div id="hud"></div>
+<div id="tune"></div>
+<div id="vig"></div>
+<div id="credit"></div>
+<div id="perf"></div>
+<div id="load">loading…</div>
+<script type="importmap">
+{ "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.166.1/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.166.1/examples/jsm/"
+} }
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+
+/* ============================ rooms ============================
+   Each scene needs different treatment, so the differences live in
+   data rather than in branches scattered through the code.
+
+   `baked: true` means the lighting is already painted into the
+   textures. Those scenes are forced to unlit materials — adding real
+   lights on top of baked light gives you two sets of shadows and washes
+   the result into mush. It's also the cheapest possible render: no
+   lighting math at all. */
+const ROOMS = {
+  backrooms: {
+    label: 'Backrooms VR',
+    file: 'assets/scenes/backrooms_vr.glb',
+    baked: true,
+    spawn: [-34, 5],          // XZ hint; snapped to the nearest walkable cell
+    credit: 'Backrooms VR by carlcapu9 — CC Attribution',
+    creditUrl: 'https://sketchfab.com/carlcapu9',
+    fog: [0x1a1710, 0.012],
+    charLight: { sky:0xfff0c4, ground:0xb59a63, dir:0xfff4d2, amb:0.55, hemi:0.75, dirI:0.85 },
+  },
+  lobby: {
+    label: 'Liminal Room',
+    file: 'assets/scenes/vr_liminal_room_baked.glb',
+    baked: true,
+    spawn: [0, 0],
+    credit: 'VR Liminal Room (baked) — Sketchfab',
+    fog: [0x2a2418, 0.01],
+    charLight: { sky:0xffeec0, ground:0xa8905c, dir:0xfff2cc, amb:0.5, hemi:0.7, dirI:0.8 },
+  },
+  pool: {
+    label: 'Pool Room',
+    file: 'assets/scenes/liminal_pool_room.glb',
+    baked: false,
+    spawn: [0, 0],
+    credit: 'Liminal Pool Room — Sketchfab',
+    lights: { ambient: 0.8, hemi: 0.9, dir: 0.9, sky: 0xcfe4f2, ground: 0x6a6250 },
+    fog: [0x243038, 0.014],
+  },
+  dreamcore: {
+    label: 'Dreamcore',
+    file: 'assets/scenes/dreamcore_liminal_space.glb',
+    baked: false,
+    spawn: [-74, 0],
+    credit: 'Dreamcore Liminal Space — Sketchfab',
+    lights: { ambient: 1.15, hemi: 1.5, dir: 2.4, sky: 0xbcd8f5, ground: 0x9a8f5e },
+    fog: [0xb9c6d6, 0.0035],
+  },
+};
+const params = new URLSearchParams(location.search);
+let roomKey = ROOMS[params.get('room')] ? params.get('room') : 'backrooms';
+
+/* ========================= tuning params ======================== */
+const TUNE = {
+  walkSpeed: 1.47, runSpeed: 4.86, accel: 26, decel: 20, airAccel: 7, turnRate: 13,
+  gravity: 24, jumpVel: 8.4, jumpWindup: 0.33, landHold: 0.40, animRate: 1.0,
+  camDist: 3.6, camHeight: 1.65, exposure: 1.0, fogDensity: 1.0,
+};
+const TUNE_SPEC = [
+  ['walkSpeed','Walk speed',0.4,6,0.05], ['runSpeed','Run speed',1,16,0.1],
+  ['accel','Accel',4,80,1], ['decel','Decel',4,80,1], ['airAccel','Air control',0,30,0.5],
+  ['turnRate','Turn rate',2,40,0.5], ['gravity','Gravity',6,60,0.5],
+  ['jumpVel','Jump power',3,18,0.1], ['jumpWindup','Jump windup (s)',0,1.5,0.01],
+  ['landHold','Land hold (s)',0,1.2,0.01], ['animRate','Anim rate ×',0.4,2.5,0.05],
+  ['camDist','Camera dist',1.2,14,0.1], ['camHeight','Camera height',0.5,5,0.05],
+  ['exposure','Exposure',0.3,2.2,0.02], ['fogDensity','Fog ×',0,3,0.05],
+];
+const DEFAULTS = {...TUNE};
+
+/* ========================== renderer ========================== */
+const renderer = new THREE.WebGLRenderer({ antialias:true, powerPreference:'default' });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5));
+renderer.setSize(innerWidth, innerHeight);
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+document.body.appendChild(renderer.domElement);
+const camera = new THREE.PerspectiveCamera(60, innerWidth/innerHeight, 0.04, 500);
+const loader = new GLTFLoader();
+const loadGLB = url => new Promise((res,rej)=>loader.load(url,res,undefined,rej));
+
+let scene, roomRoot, grid = null, baseFog = [0,0];
+
+/* ==================== collision from geometry ===================
+   These scenes ship no collision data, so it gets derived from the
+   triangles at load: horizontal faces become floor heights, vertical
+   faces become blockers wherever they cross the player's height band.
+   Rasterising into a grid once means the runtime cost is an array
+   lookup — no per-frame raycasting against 350k triangles. */
+function buildCollision(root, box){
+  const PAD = 0.5;
+  const minX = box.min.x - PAD, minZ = box.min.z - PAD;
+  const spanX = (box.max.x - box.min.x) + PAD*2, spanZ = (box.max.z - box.min.z) + PAD*2;
+  let cell = 0.4;
+  const MAXDIM = 420;
+  cell = Math.max(cell, spanX/MAXDIM, spanZ/MAXDIM);
+  const nx = Math.ceil(spanX/cell), nz = Math.ceil(spanZ/cell);
+
+  const floorY = new Float32Array(nx*nz).fill(Infinity);
+  const blocked = new Uint8Array(nx*nz);
+  const tris = [];                        // vertical faces, kept for pass 3
+  const flats = [];                       // horizontal faces, kept for pass 2
+  const hist = new Map();                 // quantised height -> area weight
+
+  const a = new THREE.Vector3(), b = new THREE.Vector3(), c = new THREE.Vector3();
+  const ab = new THREE.Vector3(), ac = new THREE.Vector3(), n = new THREE.Vector3();
+
+  root.updateWorldMatrix(true, true);
+  root.traverse(o=>{
+    if (!o.isMesh) return;
+    const g = o.geometry, pos = g.attributes.position;
+    if (!pos) return;
+    const idx = g.index;
+    const count = idx ? idx.count : pos.count;
+    for (let i=0;i<count;i+=3){
+      const i0 = idx ? idx.getX(i)   : i;
+      const i1 = idx ? idx.getX(i+1) : i+1;
+      const i2 = idx ? idx.getX(i+2) : i+2;
+      a.fromBufferAttribute(pos,i0).applyMatrix4(o.matrixWorld);
+      b.fromBufferAttribute(pos,i1).applyMatrix4(o.matrixWorld);
+      c.fromBufferAttribute(pos,i2).applyMatrix4(o.matrixWorld);
+      ab.subVectors(b,a); ac.subVectors(c,a); n.crossVectors(ab,ac).normalize();
+
+      const x0 = Math.min(a.x,b.x,c.x), x1 = Math.max(a.x,b.x,c.x);
+      const z0 = Math.min(a.z,b.z,c.z), z1 = Math.max(a.z,b.z,c.z);
+      const y0 = Math.min(a.y,b.y,c.y), y1 = Math.max(a.y,b.y,c.y);
+      const cx0 = Math.max(0, Math.floor((x0-minX)/cell)), cx1 = Math.min(nx-1, Math.floor((x1-minX)/cell));
+      const cz0 = Math.max(0, Math.floor((z0-minZ)/cell)), cz1 = Math.min(nz-1, Math.floor((z1-minZ)/cell));
+      if (cx1 < cx0 || cz1 < cz0) continue;
+
+      if (Math.abs(n.y) >= 0.6){
+        /* Horizontal face: a floor candidate. Which one is *the* floor gets
+           decided in pass 2 — taking the lowest would put the player at the
+           bottom of a pool instead of on the deck around it. */
+        if ((cx1-cx0) < 96 && (cz1-cz0) < 96){
+          flats.push(cx0,cx1,cz0,cz1,y0);
+          const q = Math.round(y0*4)/4;                     // 25cm buckets
+          const area = (cx1-cx0+1)*(cz1-cz0+1);
+          hist.set(q, (hist.get(q)||0) + area);
+        }
+      } else if ((cx1-cx0) < 64 && (cz1-cz0) < 64){
+        tris.push(cx0,cx1,cz0,cz1,y0,y1);   // flat array: far less GC than objects
+      }
+    }
+  });
+
+  /* Pass 2: the dominant floor level is whichever height covers the most
+     area. Per cell, keep the horizontal surface closest to it, so decks win
+     over pool bottoms and mezzanines don't hijack the ground. */
+  let mode = 0, best = -1;
+  for (const [h,w] of hist) if (w > best){ best = w; mode = h; }
+  const bestDist = new Float32Array(nx*nz).fill(Infinity);
+  for (let t=0;t<flats.length;t+=5){
+    const cx0=flats[t], cx1=flats[t+1], cz0=flats[t+2], cz1=flats[t+3], y=flats[t+4];
+    const dist = Math.abs(y - mode);
+    for (let cz=cz0;cz<=cz1;cz++) for (let cx=cx0;cx<=cx1;cx++){
+      const k = cz*nx+cx;
+      if (dist < bestDist[k]){ bestDist[k] = dist; floorY[k] = y; }
+    }
+  }
+
+  // Pass 3: block cells where a wall crosses knee-to-head height.
+  for (let t=0;t<tris.length;t+=6){
+    const cx0=tris[t], cx1=tris[t+1], cz0=tris[t+2], cz1=tris[t+3], y0=tris[t+4], y1=tris[t+5];
+    for (let cz=cz0;cz<=cz1;cz++) for (let cx=cx0;cx<=cx1;cx++){
+      const k = cz*nx+cx;
+      const f = floorY[k];
+      if (!isFinite(f)) continue;
+      if (y1 > f+0.28 && y0 < f+1.55) blocked[k] = 1;
+    }
+  }
+  return { nx, nz, cell, minX, minZ, floorY, blocked, mode,
+    idx(x,z){
+      const cx = Math.floor((x-this.minX)/this.cell), cz = Math.floor((z-this.minZ)/this.cell);
+      if (cx<0||cz<0||cx>=this.nx||cz>=this.nz) return -1;
+      return cz*this.nx+cx;
+    },
+    walkable(x,z, fromY){
+      const k = this.idx(x,z);
+      if (k<0 || this.blocked[k]) return false;
+      const f = this.floorY[k];
+      if (!isFinite(f)) return false;
+      return fromY === undefined ? true : Math.abs(f - fromY) < 0.65;   // no climbing walls
+    },
+    groundAt(x,z, fallback){
+      const k = this.idx(x,z);
+      if (k<0) return fallback;
+      const f = this.floorY[k];
+      return isFinite(f) ? f : fallback;
+    },
+    /* Spiral out from the requested spawn until a walkable cell turns up,
+       so a hint that lands inside geometry still produces a valid start. */
+    /* Spiral out from the hint until a walkable cell on the dominant floor
+       turns up, so a hint that lands in geometry or in a pit still yields a
+       sensible start. */
+    findSpawn(hx, hz){
+      const onMainFloor = (x,z)=>{
+        const k = this.idx(x,z);
+        return k>=0 && !this.blocked[k] && isFinite(this.floorY[k])
+               && Math.abs(this.floorY[k] - this.mode) < 0.6;
+      };
+      if (onMainFloor(hx,hz)) return [hx,hz];
+      for (let r=1;r<Math.max(this.nx,this.nz);r++){
+        for (let i=-r;i<=r;i++) for (const [dx,dz] of [[i,-r],[i,r],[-r,i],[r,i]]){
+          const x = hx + dx*this.cell, z = hz + dz*this.cell;
+          if (onMainFloor(x,z)) return [x,z];
+        }
+      }
+      for (let r=1;r<Math.max(this.nx,this.nz);r++){
+        for (let i=-r;i<=r;i++) for (const [dx,dz] of [[i,-r],[i,r],[-r,i],[r,i]]){
+          const x = hx + dx*this.cell, z = hz + dz*this.cell;
+          if (this.walkable(x,z)) return [x,z];
+        }
+      }
+      return [hx,hz];
+    }
+  };
+}
+
+/* ====================== character (shared) ====================== */
+const CLIP_TRAVEL = { Walk: 85.28, Run: 149.23, Moonwalk: 49.83 };
+let avatar, mixer, actions={}, currentAction, nominal={}, footBones=[], blob;
+const SOLE_GAP = 0.03, _v = new THREE.Vector3();
+
+function posedExtents(root){
+  const box = new THREE.Box3(), v = new THREE.Vector3();
+  root.traverse(o=>{
+    if (!o.isMesh) return;
+    const attr = o.geometry.attributes.position;
+    for (let i=0;i<attr.count;i++){
+      v.fromBufferAttribute(attr,i);
+      if (o.isSkinnedMesh && o.skeleton) o.applyBoneTransform(i,v);
+      box.expandByPoint(o.localToWorld(v));
+    }
+  });
+  return box;
+}
+function play(name, fade=0.18){
+  if (!mixer || !actions[name] || currentAction===name) return;
+  if (currentAction) actions[currentAction].fadeOut(fade);
+  actions[name].paused = false;
+  actions[name].reset().fadeIn(fade).play();
+  currentAction = name;
+}
+/* A baked scene can't receive a real shadow, so the character would look
+   pasted on. A soft blob under the feet grounds him in every room and
+   costs one transparent quad. */
+function makeBlobShadow(){
+  const c = document.createElement('canvas'); c.width = c.height = 128;
+  const ctx = c.getContext('2d');
+  const g = ctx.createRadialGradient(64,64,2, 64,64,62);
+  g.addColorStop(0,'rgba(0,0,0,0.55)'); g.addColorStop(0.55,'rgba(0,0,0,0.22)');
+  g.addColorStop(1,'rgba(0,0,0,0)');
+  ctx.fillStyle=g; ctx.fillRect(0,0,128,128);
+  const tex = new THREE.CanvasTexture(c);
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(1.25,1.25),
+    new THREE.MeshBasicMaterial({ map:tex, transparent:true, depthWrite:false, fog:false }));
+  m.rotation.x = -Math.PI/2;
+  return m;
+}
+
+async function loadAvatar(){
+  const gltf = await loadGLB('output/minimal-scifi-sikh-animated.glb');
+  gltf.scene.traverse(o=>{ if(o.isMesh) o.frustumCulled = false; });
+  avatar = new THREE.Group(); avatar.add(gltf.scene);
+  mixer = new THREE.AnimationMixer(avatar);
+  for (const c of gltf.animations) actions[c.name] = mixer.clipAction(c);
+  for (const once of ['Jump','Land'])
+    if (actions[once]){ actions[once].setLoop(THREE.LoopOnce); actions[once].clampWhenFinished = true; }
+  play(actions.Idle ? 'Idle' : 'Walk');
+  if (currentAction) actions[currentAction].setEffectiveWeight(1);
+  mixer.update(0);
+  gltf.scene.traverse(o=>{ if(o.isBone && /Toe|Foot/i.test(o.name)) footBones.push(o); });
+
+  avatar.updateMatrixWorld(true);
+  const box = posedExtents(gltf.scene);
+  const size = box.getSize(new THREE.Vector3());
+  const s = 1.75/size.y;
+  gltf.scene.scale.setScalar(s);
+  gltf.scene.position.set(-(box.min.x+size.x/2)*s, -box.min.y*s, -(box.min.z+size.z/2)*s);
+  avatar.updateMatrixWorld(true);
+
+  // Hips travel is in rig units (~100x mesh units), so the conversion
+  // needs the Hips' world scale, not the mesh scale.
+  let hipsScale = s * 0.01;
+  const hips = avatar.getObjectByName('mixamorig:Hips');
+  if (hips && hips.parent){ hips.parent.getWorldScale(_v); if (_v.x>0) hipsScale = _v.x; }
+  for (const nm of Object.keys(CLIP_TRAVEL)){
+    if (!actions[nm]) continue;
+    const dur = actions[nm].getClip().duration;
+    if (dur>0) nominal[nm] = CLIP_TRAVEL[nm]*hipsScale/dur;
+  }
+  if (nominal.Walk) TUNE.walkSpeed = DEFAULTS.walkSpeed = +nominal.Walk.toFixed(2);
+  if (nominal.Run)  TUNE.runSpeed  = DEFAULTS.runSpeed  = +nominal.Run.toFixed(2);
+  blob = makeBlobShadow();
+}
+
+/* ======================== room switching ======================= */
+function disposeRoom(){
+  if (!roomRoot) return;
+  roomRoot.traverse(o=>{
+    if (o.isMesh){
+      o.geometry?.dispose();
+      const ms = Array.isArray(o.material)?o.material:[o.material];
+      for (const m of ms){
+        for (const k of ['map','normalMap','roughnessMap','metalnessMap','emissiveMap','aoMap'])
+          m[k]?.dispose();
+        m.dispose();
+      }
+    }
+  });
+  scene.remove(roomRoot);
+  roomRoot = null;
+}
+
+async function loadRoom(key){
+  const cfg = ROOMS[key];
+  document.getElementById('load').classList.remove('hide');
+  document.getElementById('load').textContent = `loading ${cfg.label}…`;
+
+  if (scene) disposeRoom(); else scene = new THREE.Scene();
+  // drop everything but the avatar so lighting doesn't accumulate per room
+  for (const child of [...scene.children]) if (child !== avatar && child !== blob) scene.remove(child);
+
+  let gltf;
+  try { gltf = await loadGLB(cfg.file); }
+  catch(e){
+    document.getElementById('load').textContent =
+      `${cfg.label} isn't available here yet — try another room.`;
+    buildHud();
+    return;                     // keep the previous room's grid usable
+  }
+  roomRoot = gltf.scene;
+
+  /* Baked scenes: force unlit. Reproduces the artist's lighting exactly
+     and skips lighting math entirely. */
+  if (cfg.baked){
+    /* A baked room has no lights, so a PBR character renders pure black.
+       These lights are safe to add globally: the room is converted to
+       MeshBasicMaterial below, which is unlit by definition and ignores
+       them, so the only thing they can touch is the character. Tinted per
+       room so he sits in the room's own colour instead of looking pasted in. */
+    const cl = cfg.charLight || { sky:0xffffff, ground:0x888888, dir:0xffffff, amb:0.5, hemi:0.7, dirI:0.8 };
+    const amb = new THREE.AmbientLight(cl.sky, cl.amb);
+    const hemi = new THREE.HemisphereLight(cl.sky, cl.ground, cl.hemi);
+    const dir = new THREE.DirectionalLight(cl.dir, cl.dirI);
+    dir.position.set(4, 9, 3);
+    for (const l of [amb, hemi, dir]) scene.add(l);
+
+    roomRoot.traverse(o=>{
+      if (!o.isMesh) return;
+      const ms = Array.isArray(o.material)?o.material:[o.material];
+      const next = ms.map(m=>{
+        if (m.type === 'MeshBasicMaterial') return m;
+        const b = new THREE.MeshBasicMaterial({
+          map: m.map || null, color: m.color ? m.color.clone() : new THREE.Color(0xffffff),
+          side: m.side, transparent: m.transparent, opacity: m.opacity,
+          alphaTest: m.alphaTest, toneMapped: true, fog: true,
+        });
+        if (!m.map && m.emissiveMap) b.map = m.emissiveMap;
+        return b;
+      });
+      o.material = Array.isArray(o.material) ? next : next[0];
+    });
+  } else {
+    const L = cfg.lights || { ambient:0.5, hemi:0.5, dir:0.5, sky:0xdfe8f5, ground:0x8a8460 };
+    scene.add(new THREE.AmbientLight(0xffffff, L.ambient));
+    scene.add(new THREE.HemisphereLight(L.sky, L.ground, L.hemi));
+    const d = new THREE.DirectionalLight(0xfff4e2, L.dir);
+    d.position.set(30, 60, 20);
+    scene.add(d);
+  }
+  scene.add(roomRoot);
+
+  const box = new THREE.Box3().setFromObject(roomRoot);
+  baseFog = cfg.fog || [0x1a1710, 0.012];
+  scene.fog = new THREE.FogExp2(baseFog[0], baseFog[1]*TUNE.fogDensity);
+  scene.background = new THREE.Color(baseFog[0]);
+
+  grid = buildCollision(roomRoot, box);
+  const [sx, sz] = grid.findSpawn(cfg.spawn[0], cfg.spawn[1]);
+  pos.set(sx, grid.groundAt(sx, sz, box.min.y), sz);
+  vel.set(0,0,0); vy = 0; grounded = true; windupT = 0; landT = 0;
+
+  if (avatar && !avatar.parent) scene.add(avatar);
+  if (blob && !blob.parent) scene.add(blob);
+  camYaw = 0.6; camPitch = 0.22;
+  // Place the camera outright — lerping from the previous room's position
+  // means the first frames of a new room are framed from nowhere.
+  camera.position.set(
+    pos.x + Math.sin(camYaw)*Math.cos(camPitch)*TUNE.camDist,
+    pos.y + TUNE.camHeight + Math.sin(camPitch)*TUNE.camDist,
+    pos.z + Math.cos(camYaw)*Math.cos(camPitch)*TUNE.camDist);
+  camera.lookAt(pos.x, pos.y+1.2, pos.z);
+  if (avatar) avatar.position.copy(pos);
+
+  // stats
+  let tris = 0, meshes = 0;
+  roomRoot.traverse(o=>{ if(o.isMesh){ meshes++;
+    const g=o.geometry, i=g.index; tris += (i? i.count : g.attributes.position.count)/3; } });
+  let walk = 0; for (let i=0;i<grid.floorY.length;i++)
+    if (isFinite(grid.floorY[i]) && !grid.blocked[i]) walk++;
+  roomStats = `${cfg.label} · ${Math.round(tris).toLocaleString()} tris · ${meshes} meshes · ` +
+              `${(walk*grid.cell*grid.cell).toFixed(0)} m² walkable${cfg.baked?' · baked/unlit':''}`;
+
+  document.getElementById('credit').innerHTML = cfg.creditUrl
+    ? `${cfg.label} — <a href="${cfg.creditUrl}" target="_blank" rel="noopener">${cfg.credit}</a>`
+    : `${cfg.label} — ${cfg.credit}`;
+  buildHud();
+  setTimeout(()=>document.getElementById('load').classList.add('hide'), 120);
+}
+let roomStats = '';
+
+/* ========================== controller ========================= */
+const COYOTE = 0.12, JUMP_BUFFER = 0.15, RADIUS = 0.34;
+const pos = new THREE.Vector3(), vel = new THREE.Vector3();
+let vy = 0, grounded = true, heading = Math.PI, coyoteT = 0, jumpBufT = 0;
+let windupT = 0, landT = 0, dancing = false, moonwalking = false;
+let camYaw = 0.6, camPitch = 0.22, dragging = false, px = 0, py = 0;
+const keys = {};
+
+addEventListener('keydown', e=>{
+  if (e.metaKey||e.ctrlKey||e.altKey) return;
+  keys[e.code] = true;
+  if (e.code==='Space') e.preventDefault();
+  if (e.code==='KeyF'){ dancing = !dancing; moonwalking = false; }
+  if (e.code==='KeyM'){ moonwalking = !moonwalking; dancing = false; }
+  if (e.key==='Escape' && panelShown){ showPanel(false); return; }
+  const k = (e.key||'').toLowerCase();
+  if (/^[a-z]$/.test(k)){ typed = (typed+k).slice(-3); if (typed==='dev'){ showPanel(!panelShown); typed=''; } }
+});
+addEventListener('keyup', e=>keys[e.code]=false);
+renderer.domElement.addEventListener('pointerdown',e=>{dragging=true;px=e.clientX;py=e.clientY;});
+addEventListener('pointerup',()=>dragging=false);
+addEventListener('pointermove',e=>{ if(!dragging)return;
+  camYaw -= (e.clientX-px)*0.005;
+  camPitch = THREE.MathUtils.clamp(camPitch + (e.clientY-py)*0.005, -0.35, 1.15);
+  px=e.clientX; py=e.clientY; });
+addEventListener('wheel',e=>{ TUNE.camDist = THREE.MathUtils.clamp(TUNE.camDist+e.deltaY*0.006,1.2,14);
+                              syncPanel(); },{passive:true});
+
+// Axis-separated so you slide along walls instead of sticking to them.
+function moveWithCollision(dx, dz){
+  const f = pos.y;
+  if (grid.walkable(pos.x + dx + Math.sign(dx)*RADIUS, pos.z, f)) pos.x += dx;
+  if (grid.walkable(pos.x, pos.z + dz + Math.sign(dz)*RADIUS, f)) pos.z += dz;
+}
+
+const clock = new THREE.Clock();
+let elapsed = 0, fpsT = 0, frames = 0;
+window.__rooms = { keys, pos, vel, TUNE, THREE, step:()=>tick(),
+  get room(){return roomKey;}, get grid(){return grid;}, get stats(){return roomStats;},
+  probe(){ return { pos:{x:+pos.x.toFixed(2),y:+pos.y.toFixed(2),z:+pos.z.toFixed(2)},
+                    ground:+grid.groundAt(pos.x,pos.z,0).toFixed(2), grounded,
+                    speed:+Math.hypot(vel.x,vel.z).toFixed(2), action:currentAction }; } };
+
+function tick(){
+  const dt = Math.min(clock.getDelta(), 0.05);
+  elapsed += dt;
+  if (!grid) { renderer.render(scene, camera); return; }
+
+  const fwd = new THREE.Vector3(-Math.sin(camYaw),0,-Math.cos(camYaw));
+  const right = new THREE.Vector3(-fwd.z,0,fwd.x);
+  const wish = new THREE.Vector3();
+  if (keys['KeyW']) wish.add(fwd);
+  if (keys['KeyS']) wish.sub(fwd);
+  if (keys['KeyD']) wish.add(right);
+  if (keys['KeyA']) wish.sub(right);
+  const emoting = dancing || moonwalking;
+  const hasInput = wish.lengthSq()>0 && !emoting;
+  if (hasInput) wish.normalize();
+  const running = (keys['ShiftLeft']||keys['ShiftRight']) && hasInput;
+  const targetSpeed = hasInput ? (running?TUNE.runSpeed:TUNE.walkSpeed) : 0;
+
+  const target = wish.clone().multiplyScalar(targetSpeed);
+  const rate = (grounded ? (hasInput?TUNE.accel:TUNE.decel) : TUNE.airAccel) * dt;
+  vel.x += THREE.MathUtils.clamp(target.x-vel.x, -rate, rate);
+  vel.z += THREE.MathUtils.clamp(target.z-vel.z, -rate, rate);
+  moveWithCollision(vel.x*dt, vel.z*dt);
+
+  if (keys['Space']) jumpBufT = JUMP_BUFFER; else jumpBufT = Math.max(0, jumpBufT-dt);
+  coyoteT = grounded ? COYOTE : Math.max(0, coyoteT-dt);
+  if (jumpBufT>0 && coyoteT>0 && windupT<=0 && grounded){
+    windupT = Math.max(TUNE.jumpWindup, 1e-3); jumpBufT=0; coyoteT=0; play('Jump',0.05);
+  }
+  if (windupT>0){ windupT -= dt; if (windupT<=0){ vy = TUNE.jumpVel; grounded = false; } }
+
+  const ground = grid.groundAt(pos.x, pos.z, pos.y);
+  if (!grounded){
+    vy -= TUNE.gravity*dt; pos.y += vy*dt;
+    if (pos.y <= ground){ pos.y = ground; vy = 0; grounded = true; landT = TUNE.landHold;
+                          currentAction = null; if (actions.Land) play('Land',0.06); }
+  } else {
+    if (pos.y - ground > 0.45){ grounded = false; vy = 0; } else pos.y = ground;
+  }
+  if (landT>0) landT -= dt;
+
+  if (avatar){
+    const speed = Math.hypot(vel.x, vel.z);
+    if (hasInput) heading = Math.atan2(wish.x, wish.z);
+    else if (speed>0.4) heading = Math.atan2(vel.x, vel.z);
+    let d = heading - avatar.rotation.y;
+    d = Math.atan2(Math.sin(d), Math.cos(d));
+    avatar.rotation.y += d * Math.min(1, TUNE.turnRate*dt);
+
+    if (mixer){
+      if (windupT>0 || !grounded) play('Jump',0.05);
+      else if (landT>0 && actions.Land) play('Land',0.06);
+      else if (moonwalking && actions.Moonwalk) play('Moonwalk');
+      else if (dancing && actions.Dance) play('Dance');
+      else if (hasInput){
+        const nm = (running && actions.Run) ? 'Run' : 'Walk';
+        play(nm);
+        if (nominal[nm]) actions[nm].timeScale =
+          THREE.MathUtils.clamp((Math.max(speed,targetSpeed*0.35)/nominal[nm])*TUNE.animRate, 0.45, 2.6);
+      }
+      else if (actions.Idle) play('Idle');
+    }
+    avatar.position.copy(pos);
+    mixer.update(dt);
+
+    if (footBones.length && grounded && windupT<=0){
+      avatar.updateMatrixWorld(true);
+      let lowest = Infinity;
+      for (const b of footBones){ b.getWorldPosition(_v); if (_v.y<lowest) lowest=_v.y; }
+      if (isFinite(lowest)) avatar.children[0].position.y -= ((lowest-SOLE_GAP)-pos.y)*Math.min(1,9*dt);
+    }
+    if (blob){
+      blob.position.set(pos.x, ground + 0.012, pos.z);
+      const air = THREE.MathUtils.clamp(pos.y - ground, 0, 2.5);
+      const k = 1 - air/2.5;
+      blob.scale.setScalar(0.75 + 0.45*k);
+      blob.material.opacity = 0.25 + 0.6*k;
+    }
+  }
+
+  /* Camera: pull in when the ideal position would sit inside geometry —
+     the grid already knows what's solid, so no raycast needed. */
+  let dist = TUNE.camDist;
+  for (let i=0;i<6;i++){
+    const tx = pos.x + Math.sin(camYaw)*Math.cos(camPitch)*dist;
+    const tz = pos.z + Math.cos(camYaw)*Math.cos(camPitch)*dist;
+    if (grid.walkable(tx,tz) || dist < 0.9) break;
+    dist *= 0.75;
+  }
+  const cx = pos.x + Math.sin(camYaw)*Math.cos(camPitch)*dist;
+  const cz = pos.z + Math.cos(camYaw)*Math.cos(camPitch)*dist;
+  const cy = pos.y + TUNE.camHeight + Math.sin(camPitch)*dist;
+  camera.position.lerp(new THREE.Vector3(cx,cy,cz), Math.min(1,14*dt));
+  camera.lookAt(pos.x, pos.y+1.2, pos.z);
+
+  renderer.toneMappingExposure = TUNE.exposure;
+  if (scene.fog) scene.fog.density = baseFog[1]*TUNE.fogDensity;
+
+  renderer.render(scene, camera);
+  frames++; fpsT += dt;
+  if (fpsT>=1){
+    document.getElementById('perf').textContent =
+      `${Math.round(frames/fpsT)} fps · ${renderer.info.render.calls} calls · ${roomStats}`;
+    frames=0; fpsT=0;
+  }
+}
+
+/* ============================== UI ============================= */
+function buildHud(){
+  const hud = document.getElementById('hud');
+  hud.innerHTML = `<span class="keys"><b>WASD</b> move · <b>Shift</b> run · <b>Space</b> jump ·
+    <b>F</b> dance · <b>M</b> moonwalk · drag to look</span>
+    <a href="index.html">← back</a>`;
+  const wrap = document.createElement('span');
+  wrap.style.cssText = 'display:flex;gap:6px;flex-wrap:wrap';
+  for (const [k,cfg] of Object.entries(ROOMS)){
+    const b = document.createElement('button');
+    b.className = 'roomBtn' + (k===roomKey ? ' active' : '');
+    b.textContent = cfg.label;
+    b.onclick = async ()=>{
+      if (k===roomKey) return;
+      roomKey = k;
+      history.replaceState(null,'',`?room=${k}`);
+      await loadRoom(k);
+    };
+    wrap.appendChild(b);
+  }
+  hud.appendChild(wrap);
+}
+let panelShown = false, typed = '';
+function showPanel(on){ panelShown = on; document.getElementById('tune').classList.toggle('shown', on); }
+function tuneSnapshot(){
+  return `TUNE {\n${TUNE_SPEC.map(([k])=>`  ${k}: ${TUNE[k]},`).join('\n')}\n}`;
+}
+function syncPanel(){
+  document.querySelectorAll('#tune input[type=range]').forEach(i=>{
+    i.value = TUNE[i.dataset.key];
+    i.parentElement.querySelector('output').textContent = TUNE[i.dataset.key];
+  });
+}
+function buildPanel(){
+  const panel = document.getElementById('tune');
+  panel.innerHTML = `<div class="ph"><b>Tuning</b><button id="tuneToggle" title="type dev to reopen">×</button></div>
+    <div class="pb">${TUNE_SPEC.map(([k,label,min,max,step])=>`
+      <label><span>${label}</span>
+        <input type="range" min="${min}" max="${max}" step="${step}" value="${TUNE[k]}" data-key="${k}">
+        <output>${TUNE[k]}</output></label>`).join('')}
+      <div class="pact"><button id="tuneCopy">Copy to clipboard</button>
+        <button id="tuneReset">reset</button></div>
+      <textarea class="pcopy" id="tuneOut" rows="8" readonly></textarea>
+    </div>`;
+  panel.addEventListener('input', e=>{
+    const k = e.target.dataset.key; if (!k) return;
+    TUNE[k] = parseFloat(e.target.value);
+    e.target.parentElement.querySelector('output').textContent = TUNE[k];
+  });
+  document.getElementById('tuneToggle').onclick = ()=>showPanel(false);
+  document.getElementById('tuneReset').onclick = ()=>{ Object.assign(TUNE, DEFAULTS); syncPanel(); };
+  document.getElementById('tuneCopy').onclick = async ()=>{
+    const txt = tuneSnapshot(), b = document.getElementById('tuneCopy'), out = document.getElementById('tuneOut');
+    let ok = false;
+    try { await navigator.clipboard.writeText(txt); ok = true; }
+    catch(e){ out.value = txt; out.style.display='block'; out.select();
+              try { ok = document.execCommand('copy'); } catch(_){} }
+    b.textContent = ok ? 'Copied ✓' : 'Select & copy ↓';
+    setTimeout(()=>b.textContent='Copy to clipboard', 1600);
+  };
+}
+
+function safeTick(){
+  try { tick(); }
+  catch(err){ renderer.setAnimationLoop(null);
+    document.getElementById('load').classList.remove('hide');
+    document.getElementById('load').textContent = 'loop error: ' + err.message;
+    console.error(err); }
+}
+addEventListener('resize',()=>{ camera.aspect=innerWidth/innerHeight;
+  camera.updateProjectionMatrix(); renderer.setSize(innerWidth,innerHeight); });
+
+(async ()=>{
+  try {
+    scene = new THREE.Scene();
+    await loadAvatar();
+    await loadRoom(roomKey);
+    buildPanel();
+    renderer.setAnimationLoop(safeTick);
+  } catch(err){
+    document.getElementById('load').textContent = 'startup error: ' + err.message;
+    console.error(err);
+  }
+})();
+</script>
+</body>
+</html>
