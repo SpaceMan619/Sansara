@@ -537,10 +537,33 @@ async function loadAvatar(){
 
 function play(name, fade=0.18){
   if (!mixer || !actions[name] || currentAction===name) return;
-  if (currentAction) actions[currentAction].fadeOut(fade);
-  actions[name].paused = false;
-  actions[name].reset().fadeIn(fade).play();
+  const next = actions[name];
+  const prev = currentAction ? actions[currentAction] : null;
+  next.reset();
+  next.enabled = true;
+  next.setEffectiveWeight(1);
+  next.play();
+  if (prev && fade > 0){
+    prev.enabled = true;
+    next.crossFadeFrom(prev, fade, false);   // proper handover, not two fades
+  } else if (prev){
+    prev.stop();
+  }
   currentAction = name;
+}
+
+/* fadeOut() only drives an action's weight toward zero — it never stops it.
+   Interrupt a fade and the stale action keeps a residual weight forever, so
+   the run ends up permanently blended with a fraction of idle. It looks fine
+   on the first transition and degrades as states are switched. Sweeping the
+   finished ones costs a loop over eight actions. */
+function retireFadedActions(){
+  if (!mixer) return;
+  for (const key in actions){
+    if (key === currentAction) continue;
+    const a = actions[key];
+    if (a.isRunning() && a.getEffectiveWeight() < 0.005){ a.stop(); a.setEffectiveWeight(0); }
+  }
 }
 
 /* ===================== character controller =====================
@@ -699,6 +722,7 @@ function tick(){
 
     /* ---- foot planting ---- */
     mixer?.update(dt);
+    retireFadedActions();
     if (footBones.length && grounded && windupT <= 0){
       avatar.updateMatrixWorld(true);
       let lowest = Infinity;

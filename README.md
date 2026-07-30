@@ -18,7 +18,12 @@ Then visit <http://localhost:8642/>.
 
 ## Experiments
 
-### 01 — Dune World (`world.html`)
+### Liminal Rooms (`rooms.html`) — the whole thing
+
+Six rooms, one character, one page. Two are built procedurally at load (`app/rooms/*.js`), four are
+artist-made scenes that get collision inferred from their geometry. Hold **Tab** to travel.
+
+### 01 — Dune (procedural)
 
 A procedurally generated desert with a rigged, animated character you can walk, run and jump
 around a desert village.

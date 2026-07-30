@@ -50,35 +50,20 @@
     is visible over time.</p>
   </header>
 
-  <h2>Experiments</h2>
-
-  <a class="card" href="world.html">
-    <div class="badge">01 · playable</div>
-    <h3>Dune World</h3>
-    <p>A procedural desert with real dune geometry and a rigged character you can walk, run and
-    jump around a village. WASD to move, Shift to run, Space to jump, F to dance.</p>
-  </a>
-
-  <a class="card" href="backrooms.html">
-    <div class="badge">02 · playable</div>
-    <h3>Backrooms — Level 0</h3>
-    <p>A procedurally carved office maze with 7.5&nbsp;m ceilings, damp yellow wallpaper and
-    buzzing fluorescents. Every texture is generated on a canvas at load — no downloads.</p>
-  </a>
+  <h2>Enter</h2>
 
   <a class="card" href="rooms.html">
-    <div class="badge">03 · playable</div>
+    <div class="badge">six rooms · playable</div>
     <h3>Liminal Rooms</h3>
-    <p>Four artist-made 3D scenes, walkable with the same character — a baked backrooms
-    lobby, a sunlit room, a pool room and an open dreamcore hillside. Collision is derived
-    from the geometry at load, so none of them shipped with any.</p>
+    <p>One character, six places: a procedural desert, an endlessly generated backrooms,
+    and four artist-made scenes. Hold <b>Tab</b> to travel between them. WASD to move,
+    Shift to run, Space to jump.</p>
   </a>
 
   <a class="card" href="viewer.html">
-    <div class="badge">04 · tool</div>
+    <div class="badge">tool</div>
     <h3>Animation viewer</h3>
-    <p>Step through each animation clip on the rigged character in isolation, to check the rig
-    before dropping it into a scene.</p>
+    <p>Step through each clip on the rigged character in isolation.</p>
   </a>
 
   <h2>What's interesting in here</h2>
@@ -92,6 +77,9 @@
     <li><b>Skinned meshes lie about their bounds.</b> <code>Box3.setFromObject</code> measures the
     bind pose, so grounding a character by its bounding box floats it half a body height off the
     floor. The foot bones are the source of truth.</li>
+    <li><b>fadeOut doesn't stop an action.</b> Interrupt a three.js crossfade and the stale clip
+    keeps a residual weight forever — the run ends up permanently blended with a fraction of idle.
+    It looks fine on the first transition and degrades as you play.</li>
     <li><b>Baked light beats real light.</b> A pre-lit scene stores path-traced quality in its
     textures and renders unlit — cheaper <i>and</i> better looking than anything computed live.
     The catch is it's frozen: no moving sun, and a character has to be lit separately.</li>
