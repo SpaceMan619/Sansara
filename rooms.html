@@ -29,16 +29,16 @@
            background:
              radial-gradient(circle at 14% 18%, rgba(255,255,255,.94), transparent 34%),
              radial-gradient(circle at 84% 74%, rgba(168,201,255,.62), transparent 38%),
-             rgba(238,244,255,.76);
+           rgba(238,244,255,.61);
            backdrop-filter:blur(22px) saturate(155%);
            -webkit-backdrop-filter:blur(22px) saturate(155%);
            transition:opacity .42s cubic-bezier(.22,.61,.36,1), visibility .42s; }
   #travel::before, #travel::after{ content:''; position:absolute; border-radius:50%; pointer-events:none;
-           filter:blur(44px); opacity:.72; }
+           filter:blur(44px); opacity:.58; }
   #travel::before{ width:48vw; height:48vw; left:-12vw; bottom:-24vw;
            background:rgba(255,255,255,.88); animation:travelDrift 11s ease-in-out infinite; }
   #travel::after{ width:42vw; height:42vw; right:-10vw; top:-19vw;
-           background:rgba(127,168,255,.28); animation:travelDrift 14s ease-in-out infinite reverse; }
+           background:rgba(127,168,255,.22); animation:travelDrift 14s ease-in-out infinite reverse; }
   #travel.on{ opacity:1; visibility:visible; pointer-events:auto; }
   #travel .travel-head{ position:absolute; top:max(34px,7vh); left:50%; transform:translateX(-50%);
            z-index:1; width:min(1120px,calc(100vw - 48px)); display:flex; align-items:flex-end;
@@ -56,13 +56,15 @@
          scroll-snap-align:center; cursor:pointer; padding:0;
          border-radius:24px; overflow:hidden; text-align:left;
          background:rgba(255,255,255,.48); border:1px solid rgba(255,255,255,.84);
-         box-shadow:0 18px 48px rgba(86,116,170,.13), inset 0 1px rgba(255,255,255,.72);
+         /* Keep the rail atmospheric: six broad shadows merge into a
+            rectangular slab, so depth belongs to the selected card instead. */
+         box-shadow:inset 0 1px rgba(255,255,255,.72);
          transform:translateY(14px) scale(.965); opacity:0;
          transition:transform .42s cubic-bezier(.16,1,.3,1), opacity .32s ease,
                     box-shadow .34s cubic-bezier(.16,1,.3,1), border-color .3s ease;
          will-change:transform; backface-visibility:hidden; }
-  #travel.on .card:not(.sel):not(:hover){ transform:none; opacity:1; }
-  #travel.on .card.sel, #travel.on .card:hover{ opacity:1; }
+  #travel.on .card:not(.sel){ transform:none; opacity:1; }
+  #travel.on .card.sel, #travel[data-input="pointer"].on .card:hover{ opacity:1; }
   #travel .card:nth-child(1){ transition-delay:.02s } #travel .card:nth-child(2){ transition-delay:.05s }
   #travel .card:nth-child(3){ transition-delay:.08s } #travel .card:nth-child(4){ transition-delay:.11s }
   #travel .card:nth-child(5){ transition-delay:.14s } #travel .card:nth-child(6){ transition-delay:.17s }
@@ -85,13 +87,12 @@
              color:rgba(36,48,74,.58); }
   .card.here .nm::after{ content:'  here'; font:600 8.5px/1 system-ui,sans-serif;
                          letter-spacing:.18em; text-transform:uppercase; color:#6f91d8; }
-  .card:hover{ transform:translate3d(0,-5px,0); box-shadow:0 24px 58px rgba(86,116,170,.2); }
-  .card:hover .swatch{ transform:scale(1.075); }
+  #travel[data-input="pointer"] .card:hover{ transform:translate3d(0,-5px,0); box-shadow:0 0 0 1px rgba(127,168,255,.34); }
+  #travel[data-input="pointer"] .card:hover .swatch{ transform:scale(1.075); }
   /* Keyboard selection has to read at a glance and not be confusable with
      hover: the card lifts further, gains a ring, and its name goes dark. */
   .card.sel{ transform:translate3d(0,-10px,0) scale(1.025);
-             box-shadow:0 28px 70px rgba(86,116,170,.24),
-                        0 0 0 2px rgba(127,168,255,.78),
+             box-shadow:0 0 0 2px rgba(127,168,255,.78),
                         0 0 0 7px rgba(255,255,255,.62);
              border-color:rgba(255,255,255,.95); }
   .card.sel .nm{ color:#18233d; }
@@ -280,6 +281,7 @@
                  margin:3px 0 10px; padding:9px; border:1px solid rgba(83,108,157,.15); border-radius:12px;
                  background:rgba(255,255,255,.42); }
   #tune .devcam small{ grid-column:1/-1; color:rgba(41,55,85,.58); line-height:1.35; }
+  #tune .quality-note{ display:block; margin:-2px 0 12px; color:rgba(41,55,85,.52); line-height:1.4; }
   #tune #xrayToggle[aria-pressed="true"]{ background:#789ee1; border-color:#789ee1; color:#fff; }
   #tune #tuneCopy{ flex:1; background:#789ee1; border-color:#789ee1; color:#fff; font-weight:600; }
   #tune .pcopy{ display:none; width:100%; margin-top:8px; font:11px ui-monospace,monospace;
@@ -293,7 +295,7 @@
 <div id="vig"></div>
 <div id="credit"></div>
 <div id="perf" title="Measured wall-clock frame rate, average frame time, one-percent-low FPS, and draw calls">measuring frame pace…</div>
-<div id="travel" role="dialog" aria-modal="true" aria-label="Choose another place" aria-hidden="true">
+<div id="travel" data-input="keyboard" role="dialog" aria-modal="true" aria-label="Choose another place" aria-hidden="true">
   <div class="travel-head"><span class="kicker">press tab to choose your world</span><span class="count" id="travelCount" aria-live="polite"></span></div>
   <div class="rail" id="rail" aria-label="Places"></div>
   <div class="hint">hold tab · ← → to choose · release to travel</div>
@@ -347,11 +349,21 @@ const ROOMS = {
     label: 'dune', module: 'app/rooms/dune.js',
     blurb: 'A desert built from noise, with a village in the hollow.',
     credit: 'Environment kit by Kenney — CC0', creditUrl: 'https://kenney.nl',
+    tune: { walkSpeed:1.1, runSpeed:3.6, accel:28, decel:20, airAccel:7,
+      turnRate:13, gravity:24, jumpVel:5.8, jumpWindup:0.12, landHold:0.24,
+      animRate:1, camDist:7.5, camHeight:2.5, exposure:0.64, fogDensity:0.55,
+      charScale:1, envIntensity:0, ambientIntensity:0.2, hemiIntensity:0,
+      keyIntensity:1, fillIntensity:0, assetQuality:2 },
   },
   level0: {
     label: 'level 0', module: 'app/rooms/level0.js',
     blurb: 'Endless yellow rooms, generated fresh each visit.',
     credit: 'Procedural — no assets',
+    tune: { walkSpeed:1.1, runSpeed:3.6, accel:28, decel:20, airAccel:7,
+      turnRate:13, gravity:24, jumpVel:5.8, jumpWindup:0.12, landHold:0.24,
+      animRate:1, camDist:8.286, camHeight:2.5, exposure:0.3, fogDensity:2.15,
+      charScale:1.6, envIntensity:0.7, ambientIntensity:0.95,
+      hemiIntensity:0.65, keyIntensity:0.3, fillIntensity:0.55, assetQuality:2 },
   },
   backrooms: {
     label: 'the lobby', file: 'assets/scenes/backrooms_vr.glb',
@@ -384,9 +396,14 @@ const ROOMS = {
     liveMaterials: ['Material.005', 'Material.008'],
     credit: 'liminal pool room by gatgat — CC Attribution',
     creditUrl: 'https://sketchfab.com/3d-models/liminal-pool-room-13ab767a3b8d409a8a3cf31fff76d62b',
-    charLight: { sky:0xcfe0f0, ground:0x5c6a72, dir:0xdfeaf5, amb:0.30, hemi:0.42, dirI:0.45 },
-    env: { wall:0x9fb4c0, panel:0xdfeef8, floor:0x5e6d76, intensity:0.85 },
-    fog: [0x26343b, 0.0065], exposure: 0.96, charScale: 1.0, camDist: 6.0,
+    charLight: { sky:0xcfe0f0, ground:0x5c6a72, dir:0xdfeaf5, amb:0.45, hemi:1.05, dirI:0.45 },
+    env: { wall:0x9fb4c0, panel:0xdfeef8, floor:0x5e6d76, intensity:0.9 },
+    fog: [0x26343b, 0.0065], exposure: 0.58, charScale: 1.0, camDist: 11.904,
+    tune: { walkSpeed:1.1, runSpeed:3.6, accel:28, decel:20, airAccel:0,
+      turnRate:13, gravity:24, jumpVel:7.2, jumpWindup:0.12, landHold:0.24,
+      animRate:1, camDist:11.904, camHeight:2.5, exposure:0.58, fogDensity:3,
+      charScale:1, envIntensity:0.9, ambientIntensity:0.45,
+      hemiIntensity:1.05, keyIntensity:0.45, fillIntensity:0 },
   },
   dreamcore: {
     label: 'the hill', file: 'assets/scenes/dreamcore_liminal_space.glb',
@@ -394,9 +411,14 @@ const ROOMS = {
     baked: false, spawn: [-74, 0],
     credit: 'Dreamcore liminal space by CatLoveCheese — CC Attribution',
     creditUrl: 'https://sketchfab.com/3d-models/dreamcore-liminal-space-875b0005014d4b42bf1e9b2ff53ed4c4',
-    lights: { ambient: 0.5, hemi: 1.15, dir: 2.9, sky: 0xcfe2f7, ground: 0xa89a63 },
-    env: { wall:0xa9c6e4, panel:0xfff4dd, floor:0x8b8256, intensity:1.6 },
-    fog: [0xc3d2e0, 0.0030], exposure: 1.18, charScale: 1.0, camDist: 7.2,
+    lights: { ambient: 0.5, hemi: 4.0, dir: 1.85, fill: 0.65, sky: 0xcfe2f7, ground: 0xa89a63 },
+    env: { wall:0xa9c6e4, panel:0xfff4dd, floor:0x8b8256, intensity:2.6 },
+    fog: [0xc3d2e0, 0.0030], exposure: 0.3, charScale: 1.0, camDist: 7.2,
+    tune: { walkSpeed:1.1, runSpeed:3.6, accel:28, decel:20, airAccel:7,
+      turnRate:13, gravity:24, jumpVel:5.8, jumpWindup:0.12, landHold:0.24,
+      animRate:1, camDist:7.2, camHeight:2.5, exposure:0.3, fogDensity:0,
+      charScale:1, envIntensity:2.6, ambientIntensity:0.5,
+      hemiIntensity:4, keyIntensity:1.85, fillIntensity:0.65, assetQuality:2 },
   },
 };
 const params = new URLSearchParams(location.search);
@@ -404,12 +426,15 @@ let roomKey = ROOMS[params.get('room')] ? params.get('room') : 'dune';
 
 /* ========================= tuning params ======================== */
 const TUNE = {
-  walkSpeed: 1.47, runSpeed: 4.86, accel: 26, decel: 20, airAccel: 7, turnRate: 13,
-  gravity: 24, jumpVel: 8.4, jumpWindup: 0.12, landHold: 0.24, animRate: 1.0,
-  camDist: 6.2, camHeight: 1.72, exposure: 1.0, fogDensity: 1.0, charScale: 1.0,
-  envIntensity: 1.0, ambientIntensity: 0.4, hemiIntensity: 0.6,
-  keyIntensity: 1.0, fillIntensity: 0.28,
+  walkSpeed: 1.1, runSpeed: 3.6, accel: 28, decel: 20, airAccel: 7, turnRate: 13,
+  gravity: 24, jumpVel: 5.8, jumpWindup: 0.12, landHold: 0.24, animRate: 1.0,
+  // Keep the calibrated camera distance and character scale; those were
+  // experimental panel edits, not part of this new baseline.
+  camDist: 6.2, camHeight: 2.5, exposure: 0.32, fogDensity: 2.6, charScale: 1.0,
+  envIntensity: 1.9, ambientIntensity: 0.8, hemiIntensity: 0.45,
+  keyIntensity: 0.55, fillIntensity: 0, assetQuality: 1.65,
 };
+const BASELINE_TUNE = {...TUNE};
 const TUNE_SPEC = [
   ['walkSpeed','Walk speed',0.4,6,0.05], ['runSpeed','Run speed',1,16,0.1],
   ['accel','Accel',4,80,1], ['decel','Decel',4,80,1], ['airAccel','Air control',0,30,0.5],
@@ -422,12 +447,13 @@ const TUNE_SPEC = [
   ['envIntensity','Environment',0,3,0.05], ['ambientIntensity','Ambient light',0,3,0.05],
   ['hemiIntensity','Sky light',0,4,0.05], ['keyIntensity','Key light',0,6,0.05],
   ['fillIntensity','Fill light',0,3,0.05],
+  ['assetQuality','Asset quality',0.75,2,0.05],
 ];
 const DEFAULTS = {...TUNE};
 
 /* ========================== renderer ========================== */
 const renderer = new THREE.WebGLRenderer({ antialias:true, powerPreference:'default' });
-let pixelScale = Math.min(devicePixelRatio, 1.35);
+let pixelScale = TUNE.assetQuality;
 renderer.setPixelRatio(pixelScale);
 renderer.setSize(innerWidth, innerHeight);
 renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -634,6 +660,37 @@ let clipGroundOffset={}, baseModelY=0, groundOffsetY=0;
    for measuring bones and now only sinks the feet. */
 const SOLE_GAP = 0.0, _v = new THREE.Vector3();
 
+const MATERIAL_TEXTURE_KEYS = [
+  'map','normalMap','roughnessMap','metalnessMap','emissiveMap','aoMap',
+  'alphaMap','bumpMap','displacementMap','lightMap','envMap',
+];
+function sharpenTextures(root){
+  if (!root) return;
+  const maximum = renderer.capabilities.getMaxAnisotropy();
+  const anisotropy = Math.min(maximum, TUNE.assetQuality >= 1.5 ? 16 : TUNE.assetQuality >= 1 ? 8 : 4);
+  const seen = new Set();
+  root.traverse(o=>{
+    if (!o.isMesh) return;
+    const materials = Array.isArray(o.material) ? o.material : [o.material];
+    for (const material of materials){
+      if (!material) continue;
+      for (const key of MATERIAL_TEXTURE_KEYS){
+        const texture = material[key];
+        if (!texture || seen.has(texture)) continue;
+        seen.add(texture);
+        texture.anisotropy = anisotropy;
+        texture.needsUpdate = true;
+      }
+    }
+  });
+}
+function applyAssetQuality(){
+  pixelScale = THREE.MathUtils.clamp(TUNE.assetQuality, 0.75, 2);
+  renderer.setPixelRatio(pixelScale);
+  sharpenTextures(roomRoot);
+  sharpenTextures(avatar);
+}
+
 function posedExtents(root){
   const box = new THREE.Box3(), v = new THREE.Vector3();
   root.traverse(o=>{
@@ -740,7 +797,9 @@ function computeClipGroundOffsets(model, baseY){
   const names = Object.keys(actions);
   const saved = currentAction;
   const v = new THREE.Vector3();
-  const SAMPLES = 14, VSTEP = 4;      // every 4th vertex is plenty for a minimum
+  // A sparse sample missed the lowest toe between frames. More samples and
+  // every vertex make the offset a real floor clearance, not an estimate.
+  const SAMPLES = 36, VSTEP = 1;
   for (const name of names){
     const act = actions[name];
     for (const a of Object.values(actions)){ a.stop(); a.setEffectiveWeight(0); }
@@ -776,8 +835,14 @@ function computeClipGroundOffsets(model, baseY){
      the median is a reliable anchor. */
   const vals = Object.values(offs).sort((a,b)=>a-b);
   const median = vals.length ? vals[vals.length>>1] : baseY;
-  for (const k of Object.keys(offs))
-    offs[k] = THREE.MathUtils.clamp(offs[k], median-0.12, median+0.12);
+  const groundedOffset = offs.Walk ?? offs.Idle ?? median;
+  for (const k of Object.keys(offs)){
+    // Jump/Land clips contain airborne and impact poses. Their global lowest
+    // frame must not pull the character into the floor during the grounded
+    // wind-up or recovery; physics owns vertical motion for those phases.
+    if (/^(Jump|Land)/.test(k)) offs[k] = groundedOffset;
+    else offs[k] = THREE.MathUtils.clamp(offs[k], median-0.12, median+0.12);
+  }
   return offs;
 }
 
@@ -825,6 +890,7 @@ async function loadAvatar(){
   if (nominal.Walk) TUNE.walkSpeed = DEFAULTS.walkSpeed = +nominal.Walk.toFixed(2);
   if (nominal.Run)  TUNE.runSpeed  = DEFAULTS.runSpeed  = +nominal.Run.toFixed(2);
   blob = makeBlobShadow();
+  sharpenTextures(avatar);
 }
 
 /* ====================== image-based lighting ====================
@@ -903,6 +969,10 @@ function disposeRoom(){
 
 async function loadRoom(key){
   const cfg = ROOMS[key];
+  // Start each room from the shared baseline, then apply room-specific
+  // tuning where a world needs its own movement or camera feel.
+  Object.assign(TUNE, BASELINE_TUNE, cfg.tune || {});
+  Object.assign(DEFAULTS, TUNE);
   showLoader(cfg.label);
   setProgress(0.02, 'opening');
 
@@ -1005,7 +1075,7 @@ async function loadRoom(key){
     const key = new THREE.DirectionalLight(0xfff4e2, L.dir);
     key.position.set(28, 55, 18);
     scene.add(key);
-    const fill = new THREE.DirectionalLight(L.sky, L.dir*0.28);
+    const fill = new THREE.DirectionalLight(L.sky, L.fill ?? L.dir*0.28);
     fill.position.set(-30, 24, -22);
     scene.add(fill);
     devLights = { ambient:amb, hemi, key, fill };
@@ -1028,6 +1098,7 @@ async function loadRoom(key){
   }
   applyEnvironment(cfg.env);
   scene.add(roomRoot);
+  sharpenTextures(roomRoot);
 
   const box = new THREE.Box3().setFromObject(roomRoot);
   TUNE.exposure = DEFAULTS.exposure = cfg.exposure ?? 1.0;
@@ -1189,8 +1260,12 @@ addEventListener('pointermove',e=>{ if(!dragging)return;
   camYaw -= (e.clientX-px)*0.005;
   camPitch = THREE.MathUtils.clamp(camPitch + (e.clientY-py)*0.005, -0.30, 0.62);
   px=e.clientX; py=e.clientY; });
-addEventListener('wheel',e=>{ TUNE.camDist = THREE.MathUtils.clamp(TUNE.camDist+e.deltaY*0.006,1.2,14);
-                              syncPanel(); },{passive:true});
+// Zoom belongs to the world canvas. Scrolling the Dev Mode controls must
+// never leak through and move the camera behind the panel.
+renderer.domElement.addEventListener('wheel',e=>{
+  TUNE.camDist = THREE.MathUtils.clamp(TUNE.camDist+e.deltaY*0.006,1.2,14);
+  syncPanel();
+},{passive:true});
 
 // Axis-separated so you slide along walls instead of sticking to them.
 function moveWithCollision(dx, dz){
@@ -1200,7 +1275,7 @@ function moveWithCollision(dx, dz){
 }
 
 const clock = new THREE.Clock();
-let elapsed = 0, frameAvg = 0.016, resTimer = 0;
+let elapsed = 0;
 /* Physics deliberately caps dt after a stall. FPS must not: measuring the
    capped value made a 200 ms hitch look like a healthy 20 fps frame. Keep a
    separate wall-clock window and report both average FPS and slow-frame cost. */
@@ -1392,21 +1467,6 @@ function tick(){
 
   renderer.render(scene, camera);
 
-  /* Dynamic resolution: hold the frame budget and spend whatever pixels are
-     left. A fanless laptop throttles rather than dropping a fixed amount, so
-     a static pixel ratio either wastes headroom or falls off a cliff. */
-  frameAvg += (dt - frameAvg) * 0.05;
-  resTimer += dt;
-  if (resTimer > 0.9){
-    resTimer = 0;
-    const target = Math.min(devicePixelRatio, 1.35);
-    if (frameAvg > 0.0215 && pixelScale > 0.75){
-      pixelScale = Math.max(0.75, pixelScale - 0.15); renderer.setPixelRatio(pixelScale);
-    } else if (frameAvg < 0.0145 && pixelScale < target){
-      pixelScale = Math.min(target, pixelScale + 0.1); renderer.setPixelRatio(pixelScale);
-    }
-  }
-
   const perfSpan = perfNow - perfWindowMs;
   if (perfSpan >= 900){
     const fps = perfFrames * 1000 / perfSpan;
@@ -1594,6 +1654,10 @@ const REDUCE_MOTION = matchMedia('(prefers-reduced-motion: reduce)');
 const roomKeys = ()=>Object.keys(ROOMS).filter(k=>IS_LOCAL || !ROOMS[k].local);
 let travelOpen = false, travelIdx = 0, switching = false, travelCommitted = false;
 let pointerX = NaN, pointerY = NaN, travelInput = 'keyboard';
+function setTravelInput(source){
+  travelInput = source;
+  document.getElementById('travel').dataset.input = source;
+}
 
 /* A tiny synthesized glass chime keeps the selector responsive without
    shipping another asset. Every gain starts and ends above zero with a short
@@ -1666,8 +1730,8 @@ function selectTravel(i, {scroll=false, sound=true, source='keyboard'}={}){
   const count = roomKeys().length;
   if (!count) return;
   const next = (i % count + count) % count;
+  setTravelInput(source);
   if (next === travelIdx) return;
-  travelInput = source;
   travelIdx = next;
   markSelected(scroll);
   if (sound) soundMove();
@@ -1689,8 +1753,8 @@ function buildTravel(){
       <span class="idx">${String(i+1).padStart(2,'0')}</span>
       <span class="txt"><span class="nm">${cfg.label}</span>
       <span class="bl">${cfg.blurb || ''}</span></span>`;
-    el.onclick = ()=>commitTravel(k);
-    el.onpointerdown = ()=>{ travelInput = 'pointer'; audioReady(); };
+    el.onclick = ()=>{ if (travelInput === 'pointer') commitTravel(k); };
+    el.onpointerdown = ()=>{ setTravelInput('pointer'); audioReady(); };
     el.onpointermove = e=>{
       if (!Number.isFinite(pointerX)){ pointerX=e.clientX; pointerY=e.clientY; return; }
       // Keyboard mode deliberately needs a larger physical gesture, so tiny
@@ -1709,7 +1773,7 @@ function openTravel(){
   if (panelShown) showPanel(false);
   travelOpen = true;
   travelCommitted = false;
-  travelInput = 'keyboard';
+  setTravelInput('keyboard');
   travelIdx = Math.max(0, roomKeys().indexOf(roomKey));
   buildTravel();
   const travel = document.getElementById('travel');
@@ -1827,6 +1891,7 @@ function syncPanel(){
 function buildPanel(){
   const panel = document.getElementById('tune');
   const worldKeys = new Set(['exposure','fogDensity','envIntensity','ambientIntensity','hemiIntensity','keyIntensity','fillIntensity']);
+  const qualityKeys = new Set(['assetQuality']);
   const sliders = specs => specs.map(([k,label,min,max,step])=>`
       <label><span>${label}</span>
         <input type="range" min="${min}" max="${max}" step="${step}" value="${TUNE[k]}" data-key="${k}">
@@ -1835,6 +1900,9 @@ function buildPanel(){
     <div class="pb"><div class="devcam"><b>Camera inspection</b>
       <button id="xrayToggle" type="button" aria-pressed="false">X-ray off</button>
       <small>Press X while this panel is open. Closing Dev Mode restores solid scene occlusion.</small></div>
+      <div class="psection">Image quality</div>
+      ${sliders(TUNE_SPEC.filter(([k])=>qualityKeys.has(k)))}
+      <small class="quality-note">Controls true render resolution and texture sharpness. Higher settings cost more GPU.</small>
       <div class="psection" id="lookTitle">World atmosphere · ${ROOMS[roomKey].label}</div>
       <div class="look-colors">
         <label><span>Fog / backdrop</span><input type="color" data-look="fog"></label>
@@ -1846,7 +1914,7 @@ function buildPanel(){
       </div>
       ${sliders(TUNE_SPEC.filter(([k])=>worldKeys.has(k)))}
       <div class="psection">Movement & camera</div>
-      ${sliders(TUNE_SPEC.filter(([k])=>!worldKeys.has(k)))}
+      ${sliders(TUNE_SPEC.filter(([k])=>!worldKeys.has(k) && !qualityKeys.has(k)))}
       <div class="pact"><button id="tuneCopy">Copy to clipboard</button>
         <button id="tuneReset">reset</button></div>
       <textarea class="pcopy" id="tuneOut" rows="8" readonly></textarea>
@@ -1869,6 +1937,7 @@ function buildPanel(){
     TUNE[k] = parseFloat(e.target.value);
     e.target.parentElement.querySelector('output').textContent = TUNE[k];
     if (k === 'charScale') applyCharScale();
+    if (k === 'assetQuality') applyAssetQuality();
   });
   document.getElementById('tuneToggle').onclick = ()=>showPanel(false);
   document.getElementById('xrayToggle').onclick = ()=>setCameraXray(!cameraXray);
@@ -1883,6 +1952,7 @@ function buildPanel(){
     // `lights.dir` is an intensity, whereas `charLight.dir` is a color.
     devLights.key?.color.set(lc?.dir ?? 0xfff4e2);
     devLights.fill?.color.set(lc?.sky ?? ll?.sky ?? 0xffffff);
+    applyAssetQuality();
     syncPanel();
   };
   document.getElementById('tuneCopy').onclick = async ()=>{

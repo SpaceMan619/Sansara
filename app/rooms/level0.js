@@ -54,7 +54,9 @@ export async function build({ THREE }){
   const isOpenAtWorld = (x,z) => at(Math.floor((x+HALF)/CELL), Math.floor((z+HALF)/CELL));
 
   /* ------------------------- textures --------------------------- */
-  const makeCanvas = (draw, size=256) => {
+  // 512 keeps the wall grain and carpet relief crisp at native Retina
+  // rendering; the previous 256 source became visibly soft at close range.
+  const makeCanvas = (draw, size=512) => {
     const c = document.createElement('canvas'); c.width = c.height = size;
     draw(c.getContext('2d'), size); return c;
   };
@@ -275,11 +277,11 @@ export async function build({ THREE }){
     spawn: spawn || [0,0],
     baked: false,
     fog: [0x3b3318, 0.019],
-    exposure: 1.06,
-    charScale: 1.0,
-    camDist: 5.4,
-    env: { wall:0xb0a468, panel:0xffefc4, floor:0x6b5a34, intensity:1.1 },
-    lights: { ambient:0.62, hemi:0.5, dir:0.35, sky:0xe0d69e, ground:0x6b5d29 },
+    exposure: 0.3,
+    charScale: 1.6,
+    camDist: 8.286,
+    env: { wall:0xb0a468, panel:0xffefc4, floor:0x6b5a34, intensity:0.7 },
+    lights: { ambient:0.95, hemi:0.65, dir:0.3, fill:0.55, sky:0xe0d69e, ground:0x6b5d29 },
     collision: {
       ceiling: WALL_H,
       groundAt: ()=>0,
