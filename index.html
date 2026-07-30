@@ -22,7 +22,7 @@
         transform:translateY(-150%);transition:transform .2s;text-decoration:none;font-size:13px;color:#162438}
   .skip:focus{transform:none}
 
-  .hero{position:relative;isolation:isolate;min-height:calc(100svh - 28px);margin:14px;border-radius:34px;display:grid;grid-template-rows:auto 1fr auto;
+  .hero{position:relative;isolation:isolate;min-height:calc(100svh - 28px);margin:14px;border-radius:24px;display:grid;grid-template-rows:auto 1fr auto;
         padding:max(24px,env(safe-area-inset-top)) clamp(22px,5vw,70px) 28px;overflow:hidden;background:var(--dark);color:var(--ink)}
   .hero-video{position:absolute;z-index:-3;inset:0;width:100%;height:100%;object-fit:cover;object-position:center;
               filter:saturate(.82) brightness(.86) contrast(.94);transform:scale(1.015)}
@@ -33,9 +33,9 @@
   .nav-link{display:inline-flex;align-items:center;gap:10px;border-bottom:1px solid var(--line);padding:0 0 7px;
             font-size:10px;letter-spacing:.2em;text-transform:uppercase;text-decoration:none;transition:border-color .25s,color .25s}
   .nav-link:hover{color:var(--blue);border-color:var(--blue)}
-  .hero-copy{align-self:center;width:min(1080px,94vw);margin:3vh 0 0;opacity:0;animation:heroIn 1s .15s cubic-bezier(.2,.72,.2,1) forwards}
+  .hero-copy{align-self:center;width:min(1080px,94vw);margin:1vh 0 0;opacity:0;animation:heroIn 1s .15s cubic-bezier(.2,.72,.2,1) forwards}
   .eyebrow{margin:0 0 24px;font:500 10px/1 var(--sans);letter-spacing:.34em;text-transform:uppercase;color:rgba(245,247,250,.7)}
-  h1{display:block;margin:0;white-space:nowrap;font:400 clamp(58px,13.2vw,180px)/.72 var(--script);letter-spacing:-.08em;color:#fff;text-shadow:0 14px 48px rgba(0,0,0,.2)}
+  h1{display:block;margin:0;padding-top:.08em;white-space:nowrap;font:400 clamp(58px,13.2vw,180px)/.88 var(--script);letter-spacing:-.08em;color:#fff;text-shadow:0 14px 48px rgba(0,0,0,.2)}
   .lede{max-width:560px;min-height:2.4em;margin:40px 0 0;font:400 clamp(19px,2.1vw,27px)/1.18 var(--serif);color:rgba(245,247,250,.9);transition:opacity .38s ease,filter .38s ease,transform .38s ease}
   .lede.fade{opacity:0;filter:blur(5px);transform:translateY(5px)}
   .enter{display:inline-flex;align-items:center;gap:16px;margin-top:32px;padding:14px 18px 14px 21px;border:1px solid rgba(255,255,255,.64);
@@ -78,7 +78,7 @@
   .reveal{opacity:0;transform:translateY(18px);transition:opacity .8s ease,transform .9s cubic-bezier(.2,.7,.2,1)}
   .reveal.in{opacity:1;transform:none}
   @media(max-width:760px){
-    .hero{min-height:calc(100svh - 16px);margin:8px;border-radius:24px}.hero-copy{margin-top:-4vh}.lede{margin-top:32px}.gateway-head{display:block}.gateway-head span{display:block;margin-top:12px}
+    .hero{min-height:calc(100svh - 16px);margin:8px;border-radius:17px}.hero-copy{margin-top:-4vh}.lede{margin-top:32px}.gateway-head{display:block}.gateway-head span{display:block;margin-top:12px}
     .gateway-grid{grid-template-columns:1fr}.gateway-card,.gateway-card.small{min-height:350px}.footer-inner{display:block}.footer-inner span{display:block;margin-bottom:8px}
   }
   @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}*,*::before,*::after{animation-duration:.01ms!important;transition-duration:.01ms!important}.hero-video{display:none}.hero{background:linear-gradient(145deg,#22354d,#6b9ac3)}.reveal{opacity:1;transform:none}}
@@ -117,7 +117,7 @@
 
 <footer>
   <div class="footer-inner"><span>Sansara · an ongoing 3D experiment</span><details><summary>Credits</summary><span>Video by <a href="https://www.youtube.com/watch?v=e1AHGiHaeJc" target="_blank" rel="noopener">Gasendra Jr.</a></span></details></div>
-  <div class="fine">An open-ended 3D experiment</div>
+  <div class="fine">A Project Future Initiative</div>
 </footer>
 
 <script>
