@@ -863,6 +863,14 @@ async function loadRoom(key){
             m.emissive?.set(0x8ff7ef);
             m.emissiveIntensity = 1.35;
             m.toneMapped = false;
+          } else if (m.name.startsWith('Material.005')){
+            // The water stays live so the soft studio environment can move
+            // across it. Keep it deep blue and glossy; the baked room itself
+            // supplies the pale, cloudy contrast around the pool.
+            m.color?.set(0x17283c);
+            m.metalness = 0.08;
+            m.roughness = 0.16;
+            m.envMapIntensity = 1.65;
           }
           return m;
         }
@@ -975,12 +983,35 @@ let roomStats = '';
 
 /* ========================== controller ========================= */
 const COYOTE = 0.12, JUMP_BUFFER = 0.15, RADIUS = 0.34;
+/* The Jump asset is a complete take-off / airborne / recovery performance.
+   Its useful beats are at 0.42 s (feet leave the floor) and 1.58 s
+   (feet make contact again). Drive those beats from the controller rather
+   than abandoning the 2.2 s clip halfway through and starting the unrelated
+   2.53 s Hard Landing clip at its airborne first frame. */
+const JUMP_TAKEOFF = 0.42, JUMP_CONTACT = 1.58;
 const pos = new THREE.Vector3(), vel = new THREE.Vector3();
 let vy = 0, grounded = true, heading = Math.PI, coyoteT = 0, jumpBufT = 0;
 let windupT = 0, landT = 0, dancing = false, moonwalking = false;
 let camYaw = 0.6, camPitch = 0.22, dragging = false, px = 0, py = 0;
 let cameraAnchorY = 0, cameraXray = false;
 const keys = {};
+
+function setJumpPhase(phase){
+  const a = actions.Jump;
+  if (!a) return;
+  const duration = a.getClip().duration || 2.2;
+  if (phase === 'windup'){
+    a.time = 0;
+    a.timeScale = JUMP_TAKEOFF / Math.max(TUNE.jumpWindup, 0.05);
+  } else if (phase === 'air'){
+    a.time = JUMP_TAKEOFF;
+    const flight = Math.max(0.1, 2*TUNE.jumpVel/Math.max(TUNE.gravity, 0.01));
+    a.timeScale = (JUMP_CONTACT-JUMP_TAKEOFF) / flight;
+  } else if (phase === 'land'){
+    a.time = Math.min(JUMP_CONTACT, duration-0.01);
+    a.timeScale = Math.max(0.01, duration-JUMP_CONTACT) / Math.max(TUNE.landHold, 0.05);
+  }
+}
 
 addEventListener('keydown', e=>{
   if (e.metaKey||e.ctrlKey||e.altKey) return;
@@ -1081,16 +1112,33 @@ function tick(){
     windupT = Math.max(TUNE.jumpWindup, 1e-3);
     jumpBufT = 0; coyoteT = 0; landT = 0;
     play('Jump',0.05);
+    setJumpPhase('windup');
   }
-  if (windupT>0){ windupT -= dt; if (windupT<=0){ vy = TUNE.jumpVel; grounded = false; } }
+  if (windupT>0){
+    windupT -= dt;
+    if (windupT<=0){
+      vy = TUNE.jumpVel;
+      grounded = false;
+      setJumpPhase('air');
+    }
+  }
 
   const ground = grid.groundAt(pos.x, pos.z, pos.y);
   if (!grounded){
     vy -= TUNE.gravity*dt; pos.y += vy*dt;
-    if (pos.y <= ground){ pos.y = ground; vy = 0; grounded = true; landT = TUNE.landHold;
-                          if (actions.Land) play('Land',0.06); }
+    if (pos.y <= ground){
+      pos.y = ground; vy = 0; grounded = true; landT = TUNE.landHold;
+      // Jump already contains its own matching contact and recovery frames.
+      // Continue that performance at the exact moment physics touches down.
+      if (actions.Jump){ play('Jump',0.04); setJumpPhase('land'); }
+    }
   } else {
-    if (pos.y - ground > 0.45){ grounded = false; vy = 0; } else pos.y = ground;
+    if (pos.y - ground > 0.45){
+      grounded = false; vy = 0;
+      // Walking off a ledge enters the airborne portion directly: replaying
+      // the crouch while already falling looks like a second phantom jump.
+      if (actions.Jump){ play('Jump',0.08); setJumpPhase('air'); }
+    } else pos.y = ground;
   }
   if (landT>0) landT -= dt;
 
@@ -1104,7 +1152,7 @@ function tick(){
 
     if (mixer){
       if (windupT>0 || !grounded) play('Jump',0.05);
-      else if (landT>0 && actions.Land) play('Land',0.06);
+      else if (landT>0 && actions.Jump) play('Jump',0.04);
       else if (moonwalking && actions.Moonwalk) play('Moonwalk');
       else if (dancing && actions.Dance) play('Dance');
       else if (hasInput){
@@ -1392,7 +1440,10 @@ function buildTravel(){
       <span class="txt"><span class="nm">${cfg.label}</span>
       <span class="bl">${cfg.blurb || ''}</span></span>`;
     el.onclick = ()=>{ closeTravel(); goTo(k); };
-    el.onmouseenter = ()=>{ travelIdx = i; markSelected(); };
+    // Use real pointer movement, not mouseenter. When keyboard navigation
+    // scrolls/lifts cards under a stationary cursor, mouseenter can fire from
+    // the layout change and immediately undo the arrow-key selection.
+    el.onpointermove = ()=>{ travelIdx = i; markSelected(); };
     rail.appendChild(el);
   });
   markSelected();

@@ -91,6 +91,21 @@ def pool_fixture_lights():
             rot=(math.pi, 0, 0),
         )
 
+    # The room is a sealed mesh, so World illumination cannot reach its
+    # interior.  These broad, invisible ceiling sources provide the soft
+    # cloudy base light visible in the reference while the smaller fixture
+    # lights above remain the brighter directional accents.  Splitting the
+    # room in two avoids the flat, centre-hot look of one enormous emitter.
+    for i, x in enumerate((-7.27, 9.25)):
+        area_light(
+            f"cloud_fill_{i}",
+            (x, 0.0, 8.20),
+            (14.5, 11.5),
+            600.0,
+            (0.86, 0.94, 1.0),
+            rot=(math.pi, 0, 0),
+        )
+
 
 def light_the_scene(preset):
     """Low, moody ambience: a couple of dim overheads plus a cool bounce, so
