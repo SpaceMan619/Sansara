@@ -355,9 +355,10 @@ const ROOMS = {
       keyIntensity:1, fillIntensity:0, assetQuality:2 },
   },
   dune2: {
-    label: 'dune 2.0', module: 'app/rooms/dune2.js',
-    blurb: 'Sand remembers every step. Wind decides what remains.',
-    credit: 'Procedural tech demo — Sansara',
+    label: 'dark snow', module: 'app/rooms/dune2.js',
+    blurb: 'A weather study built around one low, exact sun.',
+    credit: 'Snowflow Demo by Noniv — MIT fork',
+    creditUrl: 'https://github.com/Noniv/snowflow_demo',
     tint: '#d9b27c',
   },
   level0: {
@@ -1584,7 +1585,6 @@ function flashHud(ms = 4200){
    in localStorage, so cards remain representative as the worlds evolve. */
 const DEFAULT_THUMBS = Object.freeze({
   dune: 'assets/thumbnails/dune.jpg',
-  dune2: 'assets/thumbnails/dune2.jpg',
   level0: 'assets/thumbnails/level0.jpg',
   backrooms: 'assets/thumbnails/backrooms.jpg',
   lobby: 'assets/thumbnails/lobby.jpg',
