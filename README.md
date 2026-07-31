@@ -2,7 +2,7 @@
 
 Sansara is a browser-based collection of small, walkable 3D realities. It is built around a simple promise: enter a place, look around, and let the atmosphere do the talking.
 
-**Current release: v0.4.0 — Dreamloom**
+**Current release: v0.5.0 — Dune 2.0**
 
 [Open the live build](https://spaceman619.github.io/Sansara/) · [Project Future](https://projectfuture.co.za)
 
@@ -17,6 +17,7 @@ The selector, loading screen, and world-to-world transition share one short blue
 | Place | Character | Notes |
 | --- | --- | --- |
 | **Dune** | Yes | Procedural desert village built from a height-profiled terrain and modular houses. |
+| **Dune 2.0** | Yes | A Snowflow-inspired procedural sand field with warm atmospheric lighting and a persistent “Sand Memory” trail. |
 | **Level 0** | Yes | Procedural yellow office maze with generated materials and localised lights. |
 | **The Lobby** | Yes | Artist-made baked scene with inferred floor and wall collision. |
 | **The Room** | Yes | Afternoon liminal room; available in the local build. |
@@ -74,6 +75,7 @@ The next locomotion pass will use the **Universal Animation Library** from [Quat
 - Current animation clips: [Mixamo](https://www.mixamo.com).
 - Upcoming animation library: [Quaternius](https://quaternius.itch.io/universal-animation-library), CC0; special thanks to [Gonzalo Furnier](https://x.com/Gonzalo_Anim).
 - Landing atmosphere video: [Gasendra Jr.](https://www.youtube.com/watch?v=e1AHGiHaeJc).
+- Procedural rendering reference: [Snowflow Demo](https://github.com/Noniv/snowflow_demo) by Noniv, MIT licensed. Dune 2.0 ports its material, atmosphere, and persistent-deformation ideas into Sansara’s Three.js runtime; the source remains an independent WebGPU/Babylon reference.
 
 Project code is MIT licensed. Third-party assets retain their own licenses.
 
