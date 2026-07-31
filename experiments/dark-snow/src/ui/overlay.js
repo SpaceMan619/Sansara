@@ -8,7 +8,7 @@
  * ignore.
  */
 
-import { S, SCHEMA, set, applyPreset } from "../core/settings.js";
+import { S, SCHEMA, set, applyPreset, resetAll } from "../core/settings.js";
 import { stats, systemMs, FrameGraph, spikes, resetSpikes } from "../core/perf.js";
 
 const CSS = `
@@ -40,6 +40,10 @@ const CSS = `
 }
 #ov .hdr b { font-size: 11px; font-weight: 600; letter-spacing: 0.3em; color: #e6eff8; }
 #ov .hdr i { font-style: normal; font-size: 9px; letter-spacing: 0.14em; color: #55677a; }
+#ov .hdr .actions { display: flex; align-items: center; gap: 9px; }
+#ov .hdr button { background: none; color: #71869a; border: 0; padding: 0;
+  font: inherit; font-size: 9px; letter-spacing: 0.12em; cursor: pointer; }
+#ov .hdr button:hover, #ov .hdr button:focus-visible { color: #eaf4ff; outline: none; }
 
 #ov canvas { width: 100%; height: 66px; display: block;
   background: rgba(0,0,0,0.32); border: 1px solid rgba(143,196,232,0.10); border-radius: 3px; }
@@ -116,7 +120,21 @@ export class Overlay {
         // --------------------------------------------------------- header
         const hdr = document.createElement("div");
         hdr.className = "hdr";
-        hdr.innerHTML = "<b>DARK SNOW</b><i>F1 to close</i>";
+        const mark = document.createElement("b");
+        mark.textContent = "DARK SNOW";
+        const actions = document.createElement("span");
+        actions.className = "actions";
+        const reset = document.createElement("button");
+        reset.type = "button";
+        reset.textContent = "reset all";
+        reset.title = "Restore the authored renderer settings";
+        reset.onclick = () => this._resetAll(reset);
+        const closeHint = document.createElement("i");
+        closeHint.textContent = "F1 to close";
+        actions.appendChild(reset);
+        actions.appendChild(closeHint);
+        hdr.appendChild(mark);
+        hdr.appendChild(actions);
         el.appendChild(hdr);
 
         // ----------------------------------------------------- frame graph
@@ -322,6 +340,15 @@ export class Overlay {
 
     _syncWidgets() {
         for (let i = 0; i < this.widgets.length; i++) this.widgets[i].sync();
+    }
+
+    _resetAll(btn) {
+        resetAll();
+        this._syncPresets();
+        this._syncWidgets();
+        const previous = btn.textContent;
+        btn.textContent = "restored";
+        setTimeout(() => (btn.textContent = previous), 1200);
     }
 
     toggle() {

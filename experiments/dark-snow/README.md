@@ -24,6 +24,10 @@ no meshes, no HDRIs and no animation data in this repository.
 | `1` – `5` | the five spells (`2` is a held cast) |
 | `F1` or `` ` `` | settings and performance overlay |
 
+The settings overlay includes **reset all**, which restores the complete authored
+look after experimentation. The quiet bottom-left attribution links back to the
+original Snowflow repository whenever the pointer is released with Escape.
+
 The overlay exposes every art parameter as a live slider — sun angle, wind
 bearing, subsurface radius, deformation depth, tonemap curve, exposure — plus a
 frame-time graph with median / 95th / 1% low, draw calls, triangles and a

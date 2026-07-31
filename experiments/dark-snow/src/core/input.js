@@ -50,6 +50,7 @@ export function initInput(canvas, hooks) {
 
     document.addEventListener("pointerlockchange", () => {
         input.locked = document.pointerLockElement === canvas;
+        document.documentElement.classList.toggle("pointer-locked", input.locked);
         if (!input.locked) {
             // Drop held state so the character doesn't run off while unfocused.
             for (const k in keys) keys[k] = false;
