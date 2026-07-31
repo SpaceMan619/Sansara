@@ -285,11 +285,14 @@ async function boot() {
     await loading.done();
     setTimeout(() => overlay.resetSpikes(), 800);
 
-    globalThis.SNOWFLOW = {
+    globalThis.DARK_SNOW = {
         engine, scene, rig, character, figure, contact, spray, wake, spells,
         overlay, terrain, sky, shadows, post, depthPass,
         S, input, perfStats: stats,
     };
+    // Keep the upstream console pose snippets working while the fork adopts
+    // its own public name.
+    globalThis.SNOWFLOW = globalThis.DARK_SNOW;
 }
 
 boot().catch((err) => {

@@ -21,4 +21,4 @@ Replace the current `app/rooms/dune2.js` Three.js room handoff with the forked B
 - No asset removal from the legacy `app/rooms/dune2.js` implementation yet; it is no longer the intended path and should be replaced rather than further tuned.
 - No release commit or deployment from this checkpoint.
 
-The local Python server is stopped after this checkpoint. Resume from this file, not from the old Dune 2 room implementation.
+That pause was resumed on 2026-07-31. The fork is now wired through the selector and verified as a standalone WebGPU build; the remaining work is the sand adaptation and release polish.

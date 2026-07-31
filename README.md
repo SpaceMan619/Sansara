@@ -17,7 +17,7 @@ The selector, loading screen, and world-to-world transition share one short blue
 | Place | Character | Notes |
 | --- | --- | --- |
 | **Dune** | Yes | Procedural desert village built from a height-profiled terrain and modular houses. |
-| **Dune 2.0** | Yes | A Snowflow-inspired procedural sand field with warm atmospheric lighting and a persistent “Sand Memory” trail. |
+| **Dark Snow** | Yes | The Babylon/WebGPU reality-lab fork: procedural terrain, a low sun, cascaded shadows, atmospheric LUTs, deformation, and a complete settings console. |
 | **Level 0** | Yes | Procedural yellow office maze with generated materials and localised lights. |
 | **The Lobby** | Yes | Artist-made baked scene with inferred floor and wall collision. |
 | **The Room** | Yes | Afternoon liminal room; available in the local build. |
@@ -51,6 +51,7 @@ The project is intentionally plain: static HTML, ES modules, Three.js, and a sma
 
 - `rooms.html` owns the shared controller, selector, loading states, dev mode, FPS tracker, and scene handoff.
 - `app/rooms/dune.js` and `app/rooms/level0.js` generate procedural environments.
+- `experiments/dark-snow/` is the complete MIT-licensed Snowflow fork used by the Dark Snow selector card. Its built entrypoint includes the WebGPU renderer, settings overlay, performance graph, post chain, character, terrain deformation, and spells.
 - `scripts/bake_lighting.py` bakes Cycles lighting into scene textures for rooms that need a fixed atmosphere.
 - `scripts/inplace_root_motion.py` removes unwanted horizontal root travel from animation exports.
 - `scripts/assemble_houses.py` builds the Dune village from modular pieces.

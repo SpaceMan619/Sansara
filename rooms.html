@@ -1822,6 +1822,15 @@ async function goTo(k){
     wipe.classList.add('loading');
     roomKey = k;
     history.replaceState(null,'',`?room=${k}`);
+    if (k === 'dune2') {
+      // Dark Snow is the first room to use the forked Babylon/WebGPU renderer.
+      // It lives as a static Vite build so Sansara's selector remains the
+      // threshold while the experiment keeps its complete settings UI.
+      const target = new URL('experiments/dark-snow/dist/index.html', location.href);
+      target.searchParams.set('from', 'sansara');
+      location.assign(target.href);
+      return;
+    }
     await loadRoom(k);
     wipe.classList.add('reveal');
     await new Promise(r=>setTimeout(r, REDUCE_MOTION.matches ? 60 : 720));
