@@ -2,7 +2,7 @@
 
 Sansara is a browser-based collection of small, walkable 3D realities. It is built around a simple promise: enter a place, look around, and let the atmosphere do the talking.
 
-**Current release: v0.4.0 — Dreamloom**
+**Current release: v0.5.0 — Dune 2.0**
 
 [Open the live build](https://spaceman619.github.io/Sansara/) · [Project Future](https://projectfuture.co.za)
 
@@ -17,6 +17,7 @@ The selector, loading screen, and world-to-world transition share one short blue
 | Place | Character | Notes |
 | --- | --- | --- |
 | **Dune** | Yes | Procedural desert village built from a height-profiled terrain and modular houses. |
+| **Dark Snow** | Yes | The Babylon/WebGPU reality-lab fork: procedural terrain, a low sun, cascaded shadows, atmospheric LUTs, deformation, and a complete settings console. |
 | **Level 0** | Yes | Procedural yellow office maze with generated materials and localised lights. |
 | **The Lobby** | Yes | Artist-made baked scene with inferred floor and wall collision. |
 | **The Room** | Yes | Afternoon liminal room; available in the local build. |
@@ -50,6 +51,7 @@ The project is intentionally plain: static HTML, ES modules, Three.js, and a sma
 
 - `rooms.html` owns the shared controller, selector, loading states, dev mode, FPS tracker, and scene handoff.
 - `app/rooms/dune.js` and `app/rooms/level0.js` generate procedural environments.
+- `experiments/dark-snow/` is the complete MIT-licensed Snowflow fork used by the Dark Snow selector card. Its built entrypoint includes the WebGPU renderer, settings overlay, performance graph, post chain, character, terrain deformation, and spells.
 - `scripts/bake_lighting.py` bakes Cycles lighting into scene textures for rooms that need a fixed atmosphere.
 - `scripts/inplace_root_motion.py` removes unwanted horizontal root travel from animation exports.
 - `scripts/assemble_houses.py` builds the Dune village from modular pieces.
@@ -74,6 +76,7 @@ The next locomotion pass will use the **Universal Animation Library** from [Quat
 - Current animation clips: [Mixamo](https://www.mixamo.com).
 - Upcoming animation library: [Quaternius](https://quaternius.itch.io/universal-animation-library), CC0; special thanks to [Gonzalo Furnier](https://x.com/Gonzalo_Anim).
 - Landing atmosphere video: [Gasendra Jr.](https://www.youtube.com/watch?v=e1AHGiHaeJc).
+- Procedural rendering reference: [Snowflow Demo](https://github.com/Noniv/snowflow_demo) by Noniv, MIT licensed. Dune 2.0 ports its material, atmosphere, and persistent-deformation ideas into Sansara’s Three.js runtime; the source remains an independent WebGPU/Babylon reference.
 
 Project code is MIT licensed. Third-party assets retain their own licenses.
 

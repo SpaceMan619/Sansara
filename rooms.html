@@ -295,7 +295,7 @@
 <div id="travel" data-input="keyboard" role="dialog" aria-modal="true" aria-label="Choose another place" aria-hidden="true">
   <video class="travel-video" autoplay muted playsinline loop preload="auto" aria-hidden="true"><source src="assets/video/sansara-tab-pingpong.mp4" type="video/mp4"></video>
   <div class="travel-head"><span class="kicker">press tab to choose your world</span><span class="count" id="travelCount" aria-live="polite"></span></div>
-  <span class="release" aria-label="Sansara release version">v0.4.0</span>
+  <span class="release" aria-label="Sansara release version">v0.5.0</span>
   <div class="rail" id="rail" aria-label="Places"></div>
   <div class="hint">hold tab · ← → to choose · release to travel</div>
 </div>
@@ -353,6 +353,13 @@ const ROOMS = {
       animRate:1, camDist:7.5, camHeight:2.5, exposure:0.64, fogDensity:0.55,
       charScale:1, envIntensity:0, ambientIntensity:0.2, hemiIntensity:0,
       keyIntensity:1, fillIntensity:0, assetQuality:2 },
+  },
+  dune2: {
+    label: 'dark snow', module: 'app/rooms/dune2.js',
+    blurb: 'A weather study built around one low, exact sun.',
+    credit: 'Snowflow Demo by Noniv — MIT fork',
+    creditUrl: 'https://github.com/Noniv/snowflow_demo',
+    tint: '#d9b27c',
   },
   level0: {
     label: 'level 0', module: 'app/rooms/level0.js',
@@ -1706,7 +1713,7 @@ addEventListener('pointermove', e=>{
 }, { passive:true });
 
 function tintFor(k){
-  return ({ dune:'#e7c78d', level0:'#b3a55c', backrooms:'#e2c98f',
+  return ({ dune:'#e7c78d', dune2:'#d9b27c', level0:'#b3a55c', backrooms:'#e2c98f',
             lobby:'#d9b98a', pool:'#bcd6e2', dreamcore:'#b9c8a6' })[k] || '#ddd6c8';
 }
 function markSelected(scroll=false){
@@ -1815,6 +1822,15 @@ async function goTo(k){
     wipe.classList.add('loading');
     roomKey = k;
     history.replaceState(null,'',`?room=${k}`);
+    if (k === 'dune2') {
+      // Dark Snow is the first room to use the forked Babylon/WebGPU renderer.
+      // It lives as a static Vite build so Sansara's selector remains the
+      // threshold while the experiment keeps its complete settings UI.
+      const target = new URL('experiments/dark-snow/dist/index.html', location.href);
+      target.searchParams.set('from', 'sansara');
+      location.assign(target.href);
+      return;
+    }
     await loadRoom(k);
     wipe.classList.add('reveal');
     await new Promise(r=>setTimeout(r, REDUCE_MOTION.matches ? 60 : 720));
