@@ -20,7 +20,7 @@ no meshes, no HDRIs and no animation data in this repository.
 | `W` `A` `S` `D` | move, relative to the camera |
 | Mouse | look · **Wheel** zoom |
 | `Shift` | sprint |
-| **Right mouse (hold)** | snow-surf — carve across the field and throw a wake |
+| **Space or right mouse (hold)** | snow-surf — accelerate, carve across the field and throw a wake |
 | `1` – `5` | the five spells (`2` is a held cast) |
 | `F1` or `` ` `` | settings and performance overlay |
 
