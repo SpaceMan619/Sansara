@@ -20,9 +20,13 @@ no meshes, no HDRIs and no animation data in this repository.
 | `W` `A` `S` `D` | move, relative to the camera |
 | Mouse | look · **Wheel** zoom |
 | `Shift` | sprint |
-| **Right mouse (hold)** | snow-surf — carve across the field and throw a wake |
+| **Space or right mouse (hold)** | snow-surf — accelerate, carve across the field and throw a wake |
 | `1` – `5` | the five spells (`2` is a held cast) |
 | `F1` or `` ` `` | settings and performance overlay |
+
+The settings overlay includes **reset all**, which restores the complete authored
+look after experimentation. The quiet bottom-left attribution links back to the
+original Snowflow repository whenever the pointer is released with Escape.
 
 The overlay exposes every art parameter as a live slider — sun angle, wind
 bearing, subsurface radius, deformation depth, tonemap curve, exposure — plus a

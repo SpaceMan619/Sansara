@@ -111,6 +111,9 @@ export const S = {
     debugView: "beauty", // beauty | deform | normals | depth | cascades | footprint | fineNormals
 };
 
+/** The authored look. Kept outside the mutable store so every edit is reversible. */
+export const DEFAULTS = Object.freeze({ ...S });
+
 /**
  * Widget metadata. `t`: "f" float slider, "b" bool toggle, "e" enum.
  * @type {{group:string, items:Array<{k:string,l:string,t:string,min?:number,max?:number,step?:number,opts?:string[]}>}[]}
@@ -266,4 +269,9 @@ export function applyPreset(name) {
     if (!p) return;
     S.preset = name;
     for (const k in p) set(k, p[k]);
+}
+
+/** Restore every renderer control and system toggle to the authored look. */
+export function resetAll() {
+    for (const k in DEFAULTS) set(k, DEFAULTS[k]);
 }

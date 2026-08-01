@@ -2,13 +2,13 @@
 
 Sansara is a browser-based collection of small, walkable 3D realities. It is built around a simple promise: enter a place, look around, and let the atmosphere do the talking.
 
-**Current release: v0.5.0 — Dune 2.0**
+**Current release: v0.5.1 — Dark Snow**
 
 [Open the live build](https://spaceman619.github.io/Sansara/) · [Project Future](https://projectfuture.co.za)
 
 ## What is here
 
-`rooms.html` is the main experience. Hold **Tab** to open the world selector, use **← / →** to move between cards, and release **Tab** to enter the selected room. Mouse selection works when the selector is opened with the pointer. **WASD** moves, **Shift** runs, **Space** jumps, and the mouse looks around after the scene has focus.
+`rooms.html` is the main experience. Hold **Tab** to open the world selector, use **← / →** to move between cards, and release **Tab** to enter the selected room. Mouse selection works when the selector is opened with the pointer. **WASD** moves, **Shift** runs, **Space** jumps, and the mouse looks around after the scene has focus. In Dark Snow, hold **Space** or the right mouse button to accelerate into snow-surf mode; **F1** opens its complete renderer settings.
 
 The selector, loading screen, and world-to-world transition share one short blue-and-white atmosphere loop. The goal is continuity: changing realities should feel like one gesture, not a page change.
 
@@ -37,17 +37,17 @@ The selector, loading screen, and world-to-world transition share one short blue
 
 ## Run it locally
 
-The pages load models and modules, so serve the directory instead of opening files directly:
+The entire experience—including Dark Snow—runs from one static server:
 
 ```bash
-python3 -m http.server 8642
+npm start
 ```
 
 Then open <http://127.0.0.1:8642/>.
 
 ## Development notes
 
-The project is intentionally plain: static HTML, ES modules, Three.js, and a small set of scene modules in `app/rooms/`. There is no build step to hide the work.
+The project remains mostly plain static HTML, ES modules, Three.js, and a small set of scene modules in `app/rooms/`. Dark Snow's Babylon/WebGPU source is compiled into the same deployable site with one command: `npm run build`.
 
 - `rooms.html` owns the shared controller, selector, loading states, dev mode, FPS tracker, and scene handoff.
 - `app/rooms/dune.js` and `app/rooms/level0.js` generate procedural environments.
