@@ -130,6 +130,11 @@ async function boot() {
 
     // The figure: skeleton, garment simulation, shell fur.
     const figure = new Character(scene, terrain, sky, shadows, character);
+    await loading.phase("loading Sansara character", 0.68);
+    // The GLB is a retargeted, in-place export of the Universal Animation
+    // Library. If the static asset is unavailable (for example in a source
+    // checkout before the build step), Character keeps its procedural fallback.
+    await figure.loadRigged(new URL("sansara-character.glb", document.baseURI).href);
     onChange("showCharacter", (v) => figure.setVisible(v));
     figure.registerPrepass(depthPass);
 

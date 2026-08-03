@@ -19,6 +19,11 @@ import { ShaderLanguage } from "@babylonjs/core/Materials/shaderLanguage";
 import { RawTexture } from "@babylonjs/core/Materials/Textures/rawTexture";
 import { Constants } from "@babylonjs/core/Engines/constants";
 import { Vector2, Vector3, Vector4, Color3 } from "@babylonjs/core/Maths/math";
+import { TransformNode } from "@babylonjs/core/Meshes/transformNode";
+import { LoadAssetContainerAsync } from "@babylonjs/core/Loading/sceneLoader";
+import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
+import { HemisphericLight } from "@babylonjs/core/Lights/hemisphericLight";
+import "@babylonjs/loaders/glTF";
 
 import { Figure, BONE_COUNT } from "./figure.js";
 import { makePanels, ClothSolver } from "./cloth.js";
@@ -186,7 +191,140 @@ export class Character {
         this._needSettle = true;
 
         this._visible = true;
+        this.rigged = null;
+        this._useRigged = false;
         this.setVisible(S.showCharacter !== false);
+    }
+
+    /**
+     * Load the authored Sansara character when it is available. The procedural
+     * figure remains alive as a deterministic contact proxy (and as a fallback
+     * if a browser cannot fetch the GLB), while this mesh supplies the actual
+     * silhouette and the retargeted UAL locomotion clips.
+     *
+     * @param {string} url
+     */
+    async loadRigged(url) {
+        try {
+            const container = await LoadAssetContainerAsync(url, this.scene);
+            container.addAllToScene();
+
+            // The authored mesh uses Babylon's stock material path, unlike the
+            // terrain shaders. Give that path one soft fill so it can share the
+            // scene without changing Dark Snow's sun or snow lighting.
+            const characterFill = new HemisphericLight(
+                "sansaraCharacterFill", new Vector3(0, 1, 0), this.scene
+            );
+            characterFill.intensity = 1.35;
+            characterFill.diffuse = new Color3(0.75, 0.82, 1.0);
+            characterFill.groundColor = new Color3(0.14, 0.18, 0.25);
+
+            const root = new TransformNode("sansaraCharacterRoot", this.scene);
+            const candidates = [
+                ...(container.transformNodes || []),
+                ...(container.meshes || []),
+            ];
+            for (const node of candidates) {
+                if (!node.parent) node.parent = root;
+            }
+
+            const meshes = (container.meshes || []).filter((mesh) => mesh.name !== "Cube");
+            for (const mesh of meshes) {
+                mesh.renderingGroupId = 1;
+                mesh.isPickable = false;
+                mesh.receiveShadows = false;
+                const sourceMaterial = mesh.material;
+                if (sourceMaterial) {
+                    // Dark Snow deliberately owns its terrain lighting. A
+                    // small stock-material wrapper lets the authored character
+                    // share the scene without becoming a black silhouette.
+                    const material = new StandardMaterial(
+                        `${mesh.name} · Sansara surface`, this.scene
+                    );
+                    material.disableLighting = false;
+                    material.backFaceCulling = false;
+                    material.diffuseColor = new Color3(0.78, 0.82, 0.90);
+                    material.emissiveColor = new Color3(0.08, 0.10, 0.14);
+                    mesh.material = material;
+                }
+            }
+
+            // Normalize the authored asset to the same roughly 1.8 m scale as
+            // the existing controller and place the soles exactly on terrain.
+            const bounds = root.getHierarchyBoundingVectors(true);
+            const height = Math.max(0.001, bounds.max.y - bounds.min.y);
+            const scale = 1.78 / height;
+            root.scaling.setAll(scale);
+            const scaledBounds = root.getHierarchyBoundingVectors(true);
+            const groundOffset = -scaledBounds.min.y;
+            root.position.y = groundOffset;
+
+            const groups = (container.animationGroups || []).filter((group) =>
+                [
+                    "Idle", "Walk", "Run", "Jump", "Land",
+                    "UAL_Idle", "UAL_Walk", "UAL_Jog", "UAL_Sprint",
+                    "UAL_JumpStart", "UAL_JumpLoop", "UAL_Land",
+                ].includes(group.name)
+            );
+            for (const group of groups) {
+                group.stop();
+                group.setWeightForAllAnimatables(0);
+            }
+
+            this.rigged = {
+                root,
+                meshes,
+                groundOffset,
+                groups: new Map(groups.map((group) => [group.name, group])),
+                active: null,
+                previous: null,
+                blend: 1,
+                blendDuration: 0.18,
+            };
+            this._useRigged = true;
+            this.setVisible(this._visible);
+            console.info("[sansara] authored character loaded", {
+                animations: groups.map((group) => group.name),
+                height: Number(height.toFixed(3)),
+            });
+            return true;
+        } catch (err) {
+            console.warn("[sansara] authored character unavailable; using procedural fallback", err);
+            return false;
+        }
+    }
+
+    _updateRigged(dt) {
+        const rig = this.rigged;
+        if (!rig) return;
+        const ch = this.controller;
+        rig.root.position.x = ch.position.x;
+        rig.root.position.z = ch.position.z;
+        rig.root.position.y = ch.position.y + rig.groundOffset;
+        rig.root.rotation.y = ch.facing;
+
+        const desired = ch.surf > 0.5
+            ? "UAL_Sprint"
+            : ch.speed < 0.12
+                ? "Idle"
+                : ch.speed > 2.0
+                    ? "UAL_Jog"
+                    : "Walk";
+        const next = rig.groups.get(desired) || rig.groups.get("Idle");
+        if (!next) return;
+        if (rig.active !== next) {
+            rig.previous = rig.active;
+            rig.active = next;
+            rig.blend = 0;
+            next.start(true, 1.0, next.from, next.to, false);
+            next.setWeightForAllAnimatables(0);
+        }
+        rig.blend = Math.min(1, rig.blend + dt / rig.blendDuration);
+        if (rig.previous) {
+            rig.previous.setWeightForAllAnimatables(1 - rig.blend);
+            if (rig.blend >= 1) rig.previous.stop();
+        }
+        rig.active.setWeightForAllAnimatables(rig.blend);
     }
 
     /**
@@ -323,9 +461,13 @@ export class Character {
 
     setVisible(v) {
         this._visible = !!v;
-        this.bodyMesh.isVisible = this._visible;
-        this.clothMesh.isVisible = this._visible;
-        this.furMesh.isVisible = this._visible;
+        const proceduralVisible = this._visible && !this._useRigged;
+        this.bodyMesh.isVisible = proceduralVisible;
+        this.clothMesh.isVisible = proceduralVisible;
+        this.furMesh.isVisible = proceduralVisible;
+        if (this.rigged) {
+            for (const mesh of this.rigged.meshes) mesh.isVisible = this._visible;
+        }
     }
 
     /**
@@ -341,6 +483,7 @@ export class Character {
     update(dt) {
         const ch = this.controller;
         this.figure.update(dt, ch);
+        this._updateRigged(dt);
         if (this._needSettle) {
             this._settleCloth();
             this._needSettle = false;
