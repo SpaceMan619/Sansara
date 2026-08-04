@@ -28,6 +28,18 @@ const CHARACTER_RADIUS = 0.52;
 const PHYSICS_STEP = 1 / 120;
 const CHASSIS_CLEARANCE = 0.32;
 
+// Support height is a soft maximum (log-sum-exp) of the tyre/underbody probes
+// rather than a hard Math.max. The crossover where the binding probe switches
+// used to snap the height's derivative and jitter the chassis; this keeps it
+// C1. Per metre — larger is sharper (closer to a true max, less smoothing).
+const SUPPORT_SOFTNESS = 90;
+// The rendered chassis follows the hard-solved collider through critically
+// damped rates instead of snapping to the raw per-frame solve. Height first,
+// then attitude (grounded snappier than airborne).
+const VISUAL_FOLLOW_RATE = 18;
+const GROUNDED_ATTITUDE_RATE = 14;
+const AIRBORNE_ATTITUDE_RATE = 2.2;
+
 const _forward = new Vector3();
 const _right = new Vector3();
 
@@ -61,6 +73,10 @@ export class Vehicle {
         this.active = false;
         this.loaded = false;
         this.groundOffset = 0;
+        // Rendered chassis height, critically damped toward the hard collider
+        // (this.position.y) so the collider can stay snappy without the mesh
+        // and the camera-independent body reading as jitter.
+        this.visualY = 0;
         this.steer = 0;
         this.throttle = 0;
         this.grounded = true;
@@ -188,6 +204,11 @@ export class Vehicle {
                 this.position.x, this.position.z, this._supportA
             );
             this.position.y = this._supportA.height;
+            // Seed the damped render state so the first frame sits on the ground
+            // conformed, instead of easing up from a flat pose at y=0.
+            this.visualY = this.position.y;
+            this.pitch = this._supportA.pitch;
+            this.roll = this._supportA.roll;
             this._syncVisual(0);
             console.info("[dark-snow] prototype vehicle loaded", {
                 meshes: meshes.map((mesh) => mesh.name),
@@ -346,7 +367,7 @@ export class Vehicle {
         if (!this.active) {
             this._updatePrompt(characterPosition);
             this._updateGauge();
-            this._syncVisual(0);
+            this._syncVisual(frameDt);
             return;
         }
 
@@ -540,7 +561,7 @@ export class Vehicle {
         // Solve the minimum root height satisfying every authored tyre pivot.
         // The additional body probes use the GLB's real bumper extents and its
         // measured 0.32 m underbody clearance.
-        out.height = Math.max(
+        out.height = softMax(SUPPORT_SOFTNESS, [
             frontPlus - contribution(this.frontAxle, this.halfTrack) + wheelClearance,
             frontMinus - contribution(this.frontAxle, -this.halfTrack) + wheelClearance,
             rearPlus - contribution(this.rearAxle, this.halfTrack) + wheelClearance,
@@ -557,35 +578,40 @@ export class Vehicle {
             heightAt(this.bodyRear, this.bodyHalfWidth)
                 - contribution(this.bodyRear, this.bodyHalfWidth) - CHASSIS_CLEARANCE,
             heightAt(this.bodyRear, -this.bodyHalfWidth)
-                - contribution(this.bodyRear, -this.bodyHalfWidth) - CHASSIS_CLEARANCE
-        );
+                - contribution(this.bodyRear, -this.bodyHalfWidth) - CHASSIS_CLEARANCE,
+        ]);
         return out;
     }
 
-    _syncVisual() {
+    _syncVisual(dt = 0) {
         if (!this.root) return;
         this._sampleSupport(
             this.position.x, this.position.z, this._supportA
         );
 
+        // The collider (this.position.y) is still solved hard each frame so
+        // collision and the camera stay correct; the *rendered* chassis follows
+        // it through a critically damped spring, so the soft-max crossovers and
+        // per-substep snaps read as suspension travel instead of jitter. The
+        // simulated suspensionCompression finally shows here too, as landing
+        // squash on top of that follow.
+        this.visualY = expDamp(this.visualY, this.position.y, VISUAL_FOLLOW_RATE, dt);
         this.root.position.set(
             this.position.x,
-            this.position.y + this.groundOffset,
+            this.visualY + this.groundOffset - this.suspensionCompression,
             this.position.z
         );
         const targetPitch = this.grounded
             ? this._supportA.pitch
             : Scalar.Clamp(-this.verticalVelocity * 0.018, -0.16, 0.16);
         const targetRoll = this.grounded ? this._supportA.roll : -this.steer * 0.08;
-        if (this.grounded) {
-            // Collision was solved for this exact plane; easing toward it would
-            // temporarily put the rendered bumper below the solved collider.
-            this.pitch = targetPitch;
-            this.roll = targetRoll;
-        } else {
-            this.pitch = expDamp(this.pitch, targetPitch, 2.2, 1 / 60);
-            this.roll = expDamp(this.roll, targetRoll, 2.2, 1 / 60);
-        }
+        // Damp attitude in both states. Grounded easing may differ from the
+        // solved plane by sub-centimetre bumper travel — that is exactly what
+        // suspension is — and it turns the slope chatter into a smooth lean.
+        const attitudeRate = this.grounded
+            ? GROUNDED_ATTITUDE_RATE : AIRBORNE_ATTITUDE_RATE;
+        this.pitch = expDamp(this.pitch, targetPitch, attitudeRate, dt);
+        this.roll = expDamp(this.roll, targetRoll, attitudeRate, dt);
         this.root.rotation.x = this.pitch;
         // Kenney's SUV points down +Z. Keeping the visual and physical forward
         // axes identical makes W/ArrowUp visibly drive through the windscreen,
@@ -697,4 +723,17 @@ function approach(value, target, amount) {
     if (value < target) return Math.min(target, value + amount);
     if (value > target) return Math.max(target, value - amount);
     return target;
+}
+
+// Smooth maximum (log-sum-exp). Continuous in its derivative through the
+// crossover where the largest input changes — unlike Math.max, whose kink there
+// snapped the support height and jittered the chassis. Biases the result upward
+// by at most ln(activeTerms)/k, a fixed sub-centimetre lift under the wheels.
+function softMax(k, values) {
+    let m = -Infinity;
+    for (const v of values) if (v > m) m = v;
+    if (m === -Infinity) return 0;
+    let sum = 0;
+    for (const v of values) sum += Math.exp(k * (v - m));
+    return m + Math.log(sum) / k;
 }
