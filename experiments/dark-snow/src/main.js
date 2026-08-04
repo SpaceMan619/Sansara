@@ -24,6 +24,7 @@ import { CharacterController } from "./character/controller.js";
 import { Character } from "./character/character.js";
 import { SnowContact } from "./character/snowContact.js";
 import { Vehicle } from "./vehicle/vehicle.js";
+import { VehicleContact } from "./vehicle/vehicleContact.js";
 import { SprayField } from "./vfx/particles.js";
 import { SurfWake } from "./vfx/surfWake.js";
 import { SpellSystem } from "./spells/spellSystem.js";
@@ -155,6 +156,8 @@ async function boot() {
 
     // Feet and the surf groove write into the terrain state buffer through here.
     const contact = new SnowContact(character, terrain.deform, figure.figure, spray);
+    // The car's own snow contact: tyre tracks and thrown snow while driving.
+    const vehicleContact = new VehicleContact(vehicle, terrain.deform, spray);
 
     // The breaking wave, its bow crest and the plume it sheds.
     const wake = new SurfWake(scene, sky, shadows, character, spray, terrain);
@@ -253,6 +256,9 @@ async function boot() {
         // figure has been solved.
         figure.update(dt);
         if (!vehicle.active) contact.update(dt);
+        // Guards internally on active/grounded; called every frame so it keeps
+        // its travelled-distance baseline fresh even while the player is on foot.
+        vehicleContact.update(dt);
         const tChar = performance.now();
 
         _vel.copyFrom(mover.velocity);

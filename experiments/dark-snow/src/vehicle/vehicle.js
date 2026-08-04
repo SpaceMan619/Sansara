@@ -9,6 +9,7 @@ import "@babylonjs/loaders/glTF";
 import { input } from "../core/input.js";
 import { S } from "../core/settings.js";
 import { expDamp } from "../core/camera.js";
+import { EngineSound } from "./engineSound.js";
 
 // The SUV casts into the near cascades only; like the character, its shadow in
 // cascade 2 (330 m at 32 cm/texel) is a smudge indistinguishable from the dune.
@@ -95,6 +96,9 @@ export class Vehicle {
         this.halfTrack = 0.52;
         this.bodyFront = 2.3;
         this.bodyRear = -2.05;
+
+        // Procedural engine + tyre audio, spun up on the first drive.
+        this.engine = new EngineSound();
 
         this.prompt = document.createElement("div");
         this.prompt.id = "vehicle-prompt";
@@ -344,6 +348,7 @@ export class Vehicle {
             this.throttle = 0;
             this.steer = 0;
             this.active = false;
+            this.engine.stop();
             this._updateGauge();
             this._updatePrompt(character.position);
             return true;
@@ -352,6 +357,8 @@ export class Vehicle {
         character.velocity.setAll(0);
         character.prevVelocity.setAll(0);
         this.active = true;
+        // The E keypress is the user gesture the AudioContext needs to resume.
+        this.engine.start();
         this._updateGauge();
         this.prompt.textContent = "E  ·  step out";
         this.prompt.classList.add("show");
@@ -382,6 +389,7 @@ export class Vehicle {
         this.streak01 = Scalar.Clamp((Math.abs(this.speed) - 12) / 14, 0, 1);
         this.lean = -this.steer * this.speed01 * 0.18;
         this._wheelRoll += (this.speed * frameDt) / WHEEL_RADIUS;
+        this.engine.update(this.speed01, this.throttle, this.grounded);
         this._syncVisual(frameDt);
         this._updatePrompt(characterPosition);
         this._updateGauge();
