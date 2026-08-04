@@ -81,6 +81,18 @@ export const S = {
      */
     waterDepthTint: 1.0,
 
+    // --------------------------------------------------------------- vehicle
+    /** Road speed in km/h; converted to metres/second by the controller. */
+    vehicleMaxSpeed: 58,
+    /** Forward acceleration in m/s². */
+    vehicleAcceleration: 2.5,
+    /** Service brake deceleration in m/s². */
+    vehicleBrake: 8.5,
+    /** Tyre resistance to sideways sliding. */
+    vehicleGrip: 8.0,
+    /** Clearance required before a convex crest releases the tyres. */
+    vehicleCrestRelease: 0.04,
+
     // ------------------------------------------------------------------ post
     taa: true,
     ssr: true,
@@ -116,9 +128,19 @@ export const DEFAULTS = Object.freeze({ ...S });
 
 /**
  * Widget metadata. `t`: "f" float slider, "b" bool toggle, "e" enum.
- * @type {{group:string, items:Array<{k:string,l:string,t:string,min?:number,max?:number,step?:number,opts?:string[]}>}[]}
+ * @type {{group:string, items:Array<{k:string,l:string,t:string,min?:number,max?:number,step?:number,opts?:string[],labels?:string[],segmented?:boolean}>}[]}
  */
 export const SCHEMA = [
+    {
+        group: "Vehicle",
+        items: [
+            { k: "vehicleMaxSpeed", l: "Top speed (km/h)", t: "f", min: 25, max: 120, step: 1 },
+            { k: "vehicleAcceleration", l: "Acceleration", t: "f", min: 1, max: 6, step: 0.1 },
+            { k: "vehicleBrake", l: "Braking", t: "f", min: 3, max: 16, step: 0.5 },
+            { k: "vehicleGrip", l: "Sideways tyre grip", t: "f", min: 2, max: 14, step: 0.5 },
+            { k: "vehicleCrestRelease", l: "Crest release", t: "f", min: 0, max: 0.16, step: 0.01 },
+        ],
+    },
     {
         group: "Sun & Sky",
         items: [

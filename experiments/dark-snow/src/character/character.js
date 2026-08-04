@@ -21,14 +21,15 @@ import { Constants } from "@babylonjs/core/Engines/constants";
 import { Vector2, Vector3, Vector4, Color3 } from "@babylonjs/core/Maths/math";
 import { TransformNode } from "@babylonjs/core/Meshes/transformNode";
 import { LoadAssetContainerAsync } from "@babylonjs/core/Loading/sceneLoader";
-import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
 import { HemisphericLight } from "@babylonjs/core/Lights/hemisphericLight";
+import { DirectionalLight } from "@babylonjs/core/Lights/directionalLight";
 import "@babylonjs/loaders/glTF";
 
 import { Figure, BONE_COUNT } from "./figure.js";
 import { makePanels, ClothSolver } from "./cloth.js";
 import { buildBody, buildFur, buildClothMesh } from "./build.js";
 import { S } from "../core/settings.js";
+import { input } from "../core/input.js";
 import { whenReady, bindMatrixArray } from "../core/gpuUtil.js";
 import { CASCADE_COUNT } from "../render/shadows.js";
 import { SPELL_LIGHT_UNIFORMS } from "../spells/spellLights.js";
@@ -192,7 +193,8 @@ export class Character {
 
         this._visible = true;
         this.rigged = null;
-        this._useRigged = false;
+        this.model = S.characterModel === "sansara" ? "sansara" : "original";
+        this._useRigged = this.model === "sansara";
         this.setVisible(S.showCharacter !== false);
     }
 
@@ -200,7 +202,7 @@ export class Character {
      * Load the authored Sansara character when it is available. The procedural
      * figure remains alive as a deterministic contact proxy (and as a fallback
      * if a browser cannot fetch the GLB), while this mesh supplies the actual
-     * silhouette and the retargeted UAL locomotion clips.
+     * silhouette and its native Mixamo animation clips.
      *
      * @param {string} url
      */
@@ -219,34 +221,55 @@ export class Character {
             characterFill.diffuse = new Color3(0.75, 0.82, 1.0);
             characterFill.groundColor = new Color3(0.14, 0.18, 0.25);
 
+            const characterSun = new DirectionalLight(
+                "sansaraCharacterSun", this.sky.sunDir.scale(-1), this.scene
+            );
+            characterSun.intensity = 2.35;
+            characterSun.diffuse = new Color3(1.0, 0.72, 0.43);
+
             const root = new TransformNode("sansaraCharacterRoot", this.scene);
-            const candidates = [
-                ...(container.transformNodes || []),
-                ...(container.meshes || []),
-            ];
-            for (const node of candidates) {
-                if (!node.parent) node.parent = root;
+            const mainMesh = (container.meshes || []).find((mesh) =>
+                mesh.name.toLowerCase().includes("minimal scifi sikh")
+            );
+            if (!mainMesh) throw new Error("Sansara character mesh was not found in the GLB");
+
+            // Parent only the authored hierarchy. The source file contains a
+            // preview icosphere at world origin; including it in the bounds was
+            // the reason the playable character appeared to float.
+            let authoredRoot = mainMesh;
+            while (authoredRoot.parent) authoredRoot = authoredRoot.parent;
+            authoredRoot.parent = root;
+            const meshes = [mainMesh, ...mainMesh.getChildMeshes(false)];
+            for (const mesh of container.meshes || []) {
+                // `__root__` is an AbstractMesh parent in Babylon's glTF
+                // loader. Disabling it disables the character too; hiding the
+                // helper geometry preserves the live skeleton hierarchy.
+                if (!meshes.includes(mesh)) mesh.isVisible = false;
             }
 
-            const meshes = (container.meshes || []).filter((mesh) => mesh.name !== "Cube");
             for (const mesh of meshes) {
                 mesh.renderingGroupId = 1;
                 mesh.isPickable = false;
                 mesh.receiveShadows = false;
-                const sourceMaterial = mesh.material;
-                if (sourceMaterial) {
-                    // Dark Snow deliberately owns its terrain lighting. A
-                    // small stock-material wrapper lets the authored character
-                    // share the scene without becoming a black silhouette.
-                    const material = new StandardMaterial(
-                        `${mesh.name} · Sansara surface`, this.scene
+                mesh.computeBonesUsingShaders = false;
+                if (mesh.material) {
+                    // The authored atlas was baked into vertex colours during
+                    // asset preparation. CPU-skinned positions plus a colour
+                    // attribute avoid runtime texture/skeleton binding races.
+                    const material = new ShaderMaterial(
+                        `${mesh.name} · stable Sansara colour`, this.scene,
+                        { vertex: "riggedColor", fragment: "riggedColor" },
+                        {
+                            attributes: ["position", "color"],
+                            uniforms: ["world", "viewProjection"],
+                            shaderLanguage: ShaderLanguage.WGSL,
+                        }
                     );
-                    material.disableLighting = false;
                     material.backFaceCulling = false;
-                    material.diffuseColor = new Color3(0.78, 0.82, 0.90);
-                    material.emissiveColor = new Color3(0.08, 0.10, 0.14);
                     mesh.material = material;
                 }
+                characterFill.includedOnlyMeshes.push(mesh);
+                characterSun.includedOnlyMeshes.push(mesh);
             }
 
             // Normalize the authored asset to the same roughly 1.8 m scale as
@@ -262,14 +285,16 @@ export class Character {
             const groups = (container.animationGroups || []).filter((group) =>
                 [
                     "Idle", "Walk", "Run", "Jump", "Land",
-                    "UAL_Idle", "UAL_Walk", "UAL_Jog", "UAL_Sprint",
-                    "UAL_JumpStart", "UAL_JumpLoop", "UAL_Land",
+                    "HappyIdle", "Dance", "Moonwalk",
                 ].includes(group.name)
             );
             for (const group of groups) {
                 group.stop();
                 group.setWeightForAllAnimatables(0);
             }
+            const feet = (mainMesh.skeleton?.bones || []).filter((bone) =>
+                /mixamorig:(left|right)(foot|toebase)$/i.test(bone.name)
+            );
 
             this.rigged = {
                 root,
@@ -280,12 +305,20 @@ export class Character {
                 previous: null,
                 blend: 1,
                 blendDuration: 0.18,
+                sun: characterSun,
+                feet,
+                footMesh: mainMesh,
+                soleClearance: 0.055,
+                groundCorrection: 0,
             };
-            this._useRigged = true;
+            // Do not silently replace the stable figure when the asset loads.
+            // The selector owns that decision, so a failed retarget can never
+            // make the default world appear broken.
             this.setVisible(this._visible);
             console.info("[sansara] authored character loaded", {
                 animations: groups.map((group) => group.name),
                 height: Number(height.toFixed(3)),
+                groundedFeet: feet.map((foot) => foot.name),
             });
             return true;
         } catch (err) {
@@ -296,19 +329,24 @@ export class Character {
 
     _updateRigged(dt) {
         const rig = this.rigged;
-        if (!rig) return;
+        if (!rig || !this._useRigged) return;
         const ch = this.controller;
         rig.root.position.x = ch.position.x;
         rig.root.position.z = ch.position.z;
-        rig.root.position.y = ch.position.y + rig.groundOffset;
+        rig.root.position.y = ch.groundY + rig.groundOffset;
         rig.root.rotation.y = ch.facing;
+        rig.sun.direction.copyFrom(this.sky.sunDir).scaleInPlace(-1);
 
-        const desired = ch.surf > 0.5
-            ? "UAL_Sprint"
-            : ch.speed < 0.12
-                ? "Idle"
-                : ch.speed > 2.0
-                    ? "UAL_Jog"
+        // Input release owns the return to idle. Controller velocity eases for
+        // a few frames after a run; using that residual speed to choose clips
+        // was why the legs kept cycling after the player had stopped.
+        const wantsMotion = input.moving || input.surf;
+        const desired = !wantsMotion
+            ? "Idle"
+            : ch.surf > 0.5
+            ? "Run"
+            : ch.speed > 2.0
+                    ? "Run"
                     : "Walk";
         const next = rig.groups.get(desired) || rig.groups.get("Idle");
         if (!next) return;
@@ -319,12 +357,46 @@ export class Character {
             next.start(true, 1.0, next.from, next.to, false);
             next.setWeightForAllAnimatables(0);
         }
-        rig.blend = Math.min(1, rig.blend + dt / rig.blendDuration);
+        const blendDuration = desired === "Idle" ? 0.09 : rig.blendDuration;
+        rig.blend = Math.min(1, rig.blend + dt / blendDuration);
         if (rig.previous) {
             rig.previous.setWeightForAllAnimatables(1 - rig.blend);
             if (rig.blend >= 1) rig.previous.stop();
         }
         rig.active.setWeightForAllAnimatables(rig.blend);
+        rig.active.speedRatio = desired === "Walk"
+            ? Math.max(0.72, Math.min(1.35, ch.speed / 2.25))
+            : desired === "Run"
+                ? Math.max(0.82, Math.min(1.45, ch.speed / 5.4))
+                : 1;
+
+        // The import's static mesh bounds describe its bind pose, not the
+        // animated soles. Re-anchor from the actual foot nodes every frame so
+        // slopes and different clips cannot leave the Sikh model hovering.
+        if (rig.feet.length) {
+            rig.root.computeWorldMatrix(true);
+            let correction = -Infinity;
+            for (const foot of rig.feet) {
+                const p = foot.getAbsolutePosition(rig.footMesh);
+                correction = Math.max(
+                    correction,
+                    this.terrain.heightAt(p.x, p.z) + rig.soleClearance - p.y
+                );
+            }
+            if (Number.isFinite(correction)) {
+                correction = Math.max(-0.45, Math.min(0.45, correction));
+                const settle = 1 - Math.exp(-18 * Math.min(dt, 1 / 30));
+                rig.groundCorrection += (correction - rig.groundCorrection) * settle;
+                rig.root.position.y += rig.groundCorrection;
+            }
+        }
+    }
+
+    /** Switch between the stable procedural figure and the authored GLB. */
+    setModel(model) {
+        this.model = model === "sansara" ? "sansara" : "original";
+        this._useRigged = this.model === "sansara" && !!this.rigged;
+        this.setVisible(this._visible);
     }
 
     /**
@@ -457,6 +529,24 @@ export class Character {
             this._prepassMats.push(mat);
             depth.registerCaster(spec.mesh, mat);
         }
+
+        if (this.rigged) {
+            for (const mesh of this.rigged.meshes) {
+                if (!mesh.skeleton || mesh.getTotalVertices() === 0) continue;
+                const mat = new ShaderMaterial(
+                    `${mesh.name} · rigged prepass`, this.scene,
+                    { vertex: "riggedPrepass", fragment: "prepass" },
+                    {
+                        attributes: ["position"],
+                        uniforms: ["world", "viewProjection"],
+                        shaderLanguage: ShaderLanguage.WGSL,
+                    }
+                );
+                mat.backFaceCulling = false;
+                this._prepassMats.push(mat);
+                depth.registerCaster(mesh, mat);
+            }
+        }
     }
 
     setVisible(v) {
@@ -466,7 +556,8 @@ export class Character {
         this.clothMesh.isVisible = proceduralVisible;
         this.furMesh.isVisible = proceduralVisible;
         if (this.rigged) {
-            for (const mesh of this.rigged.meshes) mesh.isVisible = this._visible;
+            const authoredVisible = this._visible && this._useRigged;
+            for (const mesh of this.rigged.meshes) mesh.isVisible = authoredVisible;
         }
     }
 
