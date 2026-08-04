@@ -139,6 +139,11 @@ async function boot() {
     await loading.phase("parking prototype vehicle", 0.72);
     const vehicle = new Vehicle(scene, terrain, sky);
     await vehicle.load(new URL("vehicles/kenney/suv.glb", document.baseURI).href);
+    // Same integration as the terrain, figure and wake: the car joins the depth
+    // prepass (so SSR / DOF / spray see it) and casts into the shadow cascades
+    // (so it is grounded rather than floating). Both no-op if the asset failed.
+    vehicle.registerPrepass(depthPass);
+    vehicle.registerShadows(shadows);
     const syncCharacterVisibility = () => {
         figure.setVisible(S.showCharacter && !vehicle.active);
     };

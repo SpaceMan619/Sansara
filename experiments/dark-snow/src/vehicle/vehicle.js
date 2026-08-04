@@ -127,40 +127,21 @@ export class Vehicle {
                 mesh.getTotalVertices?.() > 0
             );
 
-            // Snowflow's world is lit entirely in bespoke shaders. Imported
-            // GLBs need a small, isolated stock-light bridge or they render as
-            // flat charcoal silhouettes under the same post-processing.
-            const fill = new HemisphericLight(
-                "darkSnowVehicleFill", new Vector3(0, 1, 0), this.scene
-            );
-            fill.intensity = 1.15;
-            fill.diffuse = new Color3(0.72, 0.80, 1.0);
-            fill.groundColor = new Color3(0.12, 0.16, 0.23);
-            const sun = new DirectionalLight(
-                "darkSnowVehicleSun", this.sky.sunDir.scale(-1), this.scene
-            );
-            sun.intensity = 2.6;
-            sun.diffuse = new Color3(1.0, 0.71, 0.40);
-
+            // The world is lit entirely in bespoke WGSL, with no stock lights and
+            // a low camera exposure tuned for HDR-emitting surfaces. Rather than
+            // bridge in Babylon lights the rest of the scene ignores (which left
+            // the SUV a flat, post-processed silhouette and kept it out of the
+            // depth prepass and shadow cascades), the car now shares that shading
+            // path: one WGSL material lit by the same sun the sky solves, emitting
+            // in the same pre-tonemap range. Follows the imported-character
+            // precedent in character.js, one step further — the car also casts.
+            const atlas = this._findAtlas(meshes);
+            this.beautyMat = this._makeBeautyMaterial(atlas);
             for (const mesh of meshes) {
                 mesh.renderingGroupId = 1;
                 mesh.isPickable = false;
                 mesh.receiveShadows = false;
-                const sourceMaterial = mesh.material;
-                const material = new StandardMaterial(
-                    `${mesh.name} · Dark Snow vehicle`, this.scene
-                );
-                material.backFaceCulling = false;
-                material.diffuseTexture = sourceMaterial?.albedoTexture
-                    || sourceMaterial?.diffuseTexture
-                    || null;
-                material.emissiveTexture = material.diffuseTexture;
-                material.diffuseColor = new Color3(0.95, 0.97, 1.0);
-                material.emissiveColor = new Color3(0.34, 0.37, 0.43);
-                material.specularColor = new Color3(0.12, 0.14, 0.18);
-                mesh.material = material;
-                fill.includedOnlyMeshes.push(mesh);
-                sun.includedOnlyMeshes.push(mesh);
+                mesh.material = this.beautyMat;
             }
 
             const bounds = root.getHierarchyBoundingVectors(true);
@@ -201,7 +182,7 @@ export class Vehicle {
             this.frontWheels = wheels.filter((wheel) =>
                 wheel.name.toLowerCase().includes("front")
             );
-            this.sun = sun;
+            this.beautyMat.setVector3("sunDir", this.sky.sunDir);
             this.loaded = true;
             this._sampleSupport(
                 this.position.x, this.position.z, this._supportA
@@ -219,6 +200,95 @@ export class Vehicle {
             this.prompt.classList.add("show");
             return false;
         }
+    }
+
+    /** The Kenney SUV shares one `colormap.png` atlas across every mesh. */
+    _findAtlas(meshes) {
+        for (const mesh of meshes) {
+            const src = mesh.material;
+            const tex = src?.albedoTexture || src?.diffuseTexture;
+            if (tex) return tex;
+        }
+        return null;
+    }
+
+    _makeBeautyMaterial(atlas) {
+        const mat = new ShaderMaterial(
+            "darkSnowVehicleBeauty", this.scene,
+            { vertex: "vehicleColor", fragment: "vehicleColor" },
+            {
+                attributes: ["position", "normal", "uv"],
+                uniforms: ["world", "viewProjection", "sunDir"],
+                samplers: ["carTex"],
+                shaderLanguage: ShaderLanguage.WGSL,
+            }
+        );
+        // Kenney authors a closed body, but the low-poly windows are single-sided
+        // quads; matching the old StandardMaterial keeps them from vanishing.
+        mat.backFaceCulling = false;
+        if (atlas) mat.setTexture("carTex", atlas);
+        return mat;
+    }
+
+    /**
+     * Register every SUV mesh into the camera-space depth prepass, using the
+     * same generic imported-mesh vertex program the character uses. Without
+     * this the car is absent from the depth target every screen-space pass reads
+     * — so SSR skips it, DOF mis-focuses it and the snow spray draws through it.
+     *
+     * @param {import("../render/depthPass.js").DepthPass} depth
+     */
+    registerPrepass(depth) {
+        if (!this.loaded) return;
+        this._prepassMats = [];
+        for (const mesh of this.meshes) {
+            const mat = new ShaderMaterial(
+                `${mesh.name} · vehicle prepass`, this.scene,
+                { vertex: "riggedPrepass", fragment: "prepass" },
+                {
+                    attributes: ["position"],
+                    uniforms: ["world", "viewProjection"],
+                    shaderLanguage: ShaderLanguage.WGSL,
+                }
+            );
+            mat.backFaceCulling = false;
+            this._prepassMats.push(mat);
+            depth.registerCaster(mesh, mat);
+        }
+    }
+
+    /**
+     * Register the SUV as a shadow caster. A parked car with no contact shadow
+     * is the loudest "floating object" cue on the snow; this grounds it.
+     *
+     * @param {import("../render/shadows.js").ShadowSystem} shadows
+     */
+    registerShadows(shadows) {
+        if (!this.loaded) return;
+        this._depthMats = [];
+        for (const mesh of this.meshes) {
+            shadows.registerCaster(
+                mesh, (c) => this._makeDepthMaterial(c), VEHICLE_CASCADES
+            );
+        }
+    }
+
+    _makeDepthMaterial(cascade) {
+        const mat = new ShaderMaterial(
+            "vehicleDepth" + cascade, this.scene,
+            { vertex: "vehicleDepth", fragment: "terrainDepth" },
+            {
+                attributes: ["position"],
+                uniforms: ["world", "lightViewProjection"],
+                shaderLanguage: ShaderLanguage.WGSL,
+                // A distinct Effect per cascade so each holds its own light
+                // matrix without mid-frame uniform juggling (as charDepth does).
+                defines: ["VEHICLE_CASCADE " + cascade],
+            }
+        );
+        mat.backFaceCulling = false;
+        this._depthMats.push(mat);
+        return mat;
     }
 
     canEnter(characterPosition) {
@@ -269,7 +339,9 @@ export class Vehicle {
 
     update(dt, characterPosition) {
         if (!this.loaded) return;
-        this.sun.direction.copyFrom(this.sky.sunDir).scaleInPlace(-1);
+        // Track the sky's sun so the car's shading stays consistent with the
+        // terrain as the atmosphere solve moves the light through the day.
+        this.beautyMat.setVector3("sunDir", this.sky.sunDir);
         const frameDt = Math.min(dt, 0.1);
         if (!this.active) {
             this._updatePrompt(characterPosition);
