@@ -35,14 +35,18 @@ const LOOK_SCALE = 0.0022;
 
 /** @type {(() => void)|null} */
 let onToggleOverlay = null;
+/** @type {(() => void)|null} */
+let onToggleVehicle = null;
 let mouseSurf = false;
 
 /**
  * @param {HTMLCanvasElement} canvas
- * @param {{ onToggleOverlay?: () => void }} [hooks]
+ * @param {{ onToggleOverlay?: () => void,
+ *           onToggleVehicle?: () => void }} [hooks]
  */
 export function initInput(canvas, hooks) {
     onToggleOverlay = hooks?.onToggleOverlay ?? null;
+    onToggleVehicle = hooks?.onToggleVehicle ?? null;
 
     canvas.addEventListener("click", () => {
         if (!input.locked) canvas.requestPointerLock();
@@ -92,6 +96,13 @@ export function initInput(canvas, hooks) {
         if (e.code === "F1" || e.code === "Backquote") {
             e.preventDefault();
             onToggleOverlay?.();
+            return;
+        }
+        // Entry must match the visible prompt. Pointer lock can be declined or
+        // delayed by the browser, but that should never make E silently fail.
+        if (e.code === "KeyE" && !e.repeat) {
+            e.preventDefault();
+            onToggleVehicle?.();
             return;
         }
         if (e.code === "Space") e.preventDefault();

@@ -8,7 +8,7 @@
  * ignore.
  */
 
-import { S, SCHEMA, set, applyPreset, resetAll } from "../core/settings.js";
+import { S, SCHEMA, set, onChange, applyPreset, resetAll } from "../core/settings.js";
 import { stats, systemMs, FrameGraph, spikes, resetSpikes } from "../core/perf.js";
 
 const CSS = `
@@ -77,6 +77,25 @@ const CSS = `
 #ov select { flex: 1; background: rgba(0,0,0,0.35); color: #dbe6f2;
   border: 1px solid rgba(143,196,232,0.16); border-radius: 3px; padding: 2px 5px;
   font: inherit; outline: none; cursor: pointer; }
+
+#ov .choice-row { display: block; margin: 8px 0 14px; }
+#ov .choice-row > label { display: block; margin-bottom: 7px; color: #6f8296; }
+#ov .seg { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+#ov .seg button {
+  min-height: 42px; padding: 7px 9px; text-align: left;
+  border: 1px solid rgba(143,196,232,0.13); border-radius: 5px;
+  background: rgba(143,196,232,0.045); color: #8195aa;
+  font: inherit; line-height: 1.25; cursor: pointer;
+  transition: color 140ms ease, border-color 140ms ease, background 140ms ease;
+}
+#ov .seg button:hover, #ov .seg button:focus-visible {
+  color: #dbe6f2; border-color: rgba(143,196,232,0.34); outline: none;
+}
+#ov .seg button.on {
+  color: #eef7ff; border-color: rgba(143,196,232,0.56);
+  background: linear-gradient(145deg, rgba(143,196,232,0.18), rgba(143,196,232,0.07));
+  box-shadow: inset 0 0 18px rgba(143,196,232,0.05);
+}
 
 #ov .presets { display: flex; gap: 6px; margin-top: 4px; }
 #ov .presets button { flex: 1; background: rgba(143,196,232,0.07); color: #8fa3b8;
@@ -236,6 +255,10 @@ export class Overlay {
         this._graphAcc = 0;
         this._camAcc = 0;
         this._pose = "";
+
+        // Keyboard character swaps and future external controls should update
+        // the visible choice immediately, not only after the panel is reopened.
+        onChange("characterModel", () => this._syncWidgets());
     }
 
     /**
@@ -269,7 +292,7 @@ export class Overlay {
         for (let i = 0; i < group.items.length; i++) {
             const it = group.items[i];
             const row = document.createElement("div");
-            row.className = "row";
+            row.className = "row" + (it.segmented ? " choice-row" : "");
             const lab = document.createElement("label");
             lab.textContent = it.l;
             row.appendChild(lab);
@@ -315,17 +338,41 @@ export class Overlay {
                     sync: () => sw.classList.toggle("on", !!S[it.k]),
                 });
             } else if (it.t === "e") {
-                const sel = document.createElement("select");
-                for (let o = 0; o < it.opts.length; o++) {
-                    const op = document.createElement("option");
-                    op.value = it.opts[o];
-                    op.textContent = it.opts[o];
-                    sel.appendChild(op);
+                if (it.segmented) {
+                    const seg = document.createElement("div");
+                    seg.className = "seg";
+                    const buttons = [];
+                    for (let o = 0; o < it.opts.length; o++) {
+                        const button = document.createElement("button");
+                        button.type = "button";
+                        button.textContent = it.labels?.[o] ?? it.opts[o];
+                        button.onclick = () => set(it.k, it.opts[o]);
+                        seg.appendChild(button);
+                        buttons.push(button);
+                    }
+                    const sync = () => {
+                        for (let o = 0; o < buttons.length; o++) {
+                            const active = S[it.k] === it.opts[o];
+                            buttons[o].classList.toggle("on", active);
+                            buttons[o].setAttribute("aria-pressed", String(active));
+                        }
+                    };
+                    sync();
+                    row.appendChild(seg);
+                    this.widgets.push({ k: it.k, sync });
+                } else {
+                    const sel = document.createElement("select");
+                    for (let o = 0; o < it.opts.length; o++) {
+                        const op = document.createElement("option");
+                        op.value = it.opts[o];
+                        op.textContent = it.labels?.[o] ?? it.opts[o];
+                        sel.appendChild(op);
+                    }
+                    sel.value = String(S[it.k]);
+                    sel.onchange = () => set(it.k, sel.value);
+                    row.appendChild(sel);
+                    this.widgets.push({ k: it.k, sync: () => (sel.value = String(S[it.k])) });
                 }
-                sel.value = String(S[it.k]);
-                sel.onchange = () => set(it.k, sel.value);
-                row.appendChild(sel);
-                this.widgets.push({ k: it.k, sync: () => (sel.value = String(S[it.k])) });
             }
 
             this.el.appendChild(row);

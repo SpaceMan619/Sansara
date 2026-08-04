@@ -171,6 +171,95 @@
 
     #hint.show { opacity: 1; }
 
+    #vehicle-prompt {
+        position: fixed;
+        left: 50%;
+        bottom: 76px;
+        z-index: 55;
+        transform: translate3d(-50%, 8px, 0);
+        padding: 8px 13px;
+        border: 1px solid rgba(219, 230, 242, 0.22);
+        border-radius: 999px;
+        background: rgba(7, 11, 18, 0.48);
+        backdrop-filter: blur(12px) saturate(1.15);
+        color: rgba(234, 244, 255, 0.84);
+        font-size: 9px;
+        letter-spacing: 0.2em;
+        text-transform: uppercase;
+        pointer-events: none;
+        opacity: 0;
+        transition: opacity 180ms ease, transform 180ms ease;
+    }
+
+    #vehicle-prompt.show {
+        opacity: 1;
+        transform: translate3d(-50%, 0, 0);
+    }
+
+    #vehicle-speed {
+        position: fixed;
+        right: 28px;
+        bottom: 28px;
+        z-index: 55;
+        width: 156px;
+        padding: 14px 15px 12px;
+        border: 1px solid rgba(219, 230, 242, 0.2);
+        border-radius: 12px;
+        background: rgba(7, 11, 18, 0.5);
+        backdrop-filter: blur(14px) saturate(1.15);
+        color: #eaf4ff;
+        font-variant-numeric: tabular-nums;
+        pointer-events: none;
+        opacity: 0;
+        transform: translateY(8px);
+        transition: opacity 180ms ease, transform 180ms ease;
+    }
+    #vehicle-speed.show { opacity: 1; transform: none; }
+    .vehicle-speed-caption {
+        display: block;
+        margin-bottom: 2px;
+        color: rgba(219, 230, 242, 0.48);
+        font-size: 8px;
+        letter-spacing: 0.24em;
+    }
+    #vehicle-speed strong {
+        font-size: 30px;
+        font-weight: 300;
+        line-height: 1;
+        letter-spacing: -0.04em;
+    }
+    .vehicle-speed-unit {
+        margin-left: 5px;
+        color: rgba(219, 230, 242, 0.56);
+        font-size: 8px;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+    }
+    .vehicle-speed-track {
+        position: relative;
+        display: block;
+        height: 2px;
+        margin-top: 10px;
+        overflow: hidden;
+        background: rgba(219, 230, 242, 0.14);
+    }
+    .vehicle-speed-track i {
+        position: absolute;
+        inset: 0 auto 0 0;
+        width: 0;
+        background: linear-gradient(90deg, #7faecf, #eaf4ff);
+        box-shadow: 0 0 8px rgba(143, 196, 232, 0.55);
+        transition: width 90ms linear;
+    }
+    .vehicle-speed-state {
+        position: absolute;
+        top: 15px;
+        right: 15px;
+        color: rgba(219, 230, 242, 0.62);
+        font-size: 9px;
+        letter-spacing: 0.12em;
+    }
+
     #back {
         position: fixed;
         top: 20px;
@@ -211,21 +300,46 @@
         outline: none;
     }
 </style>
-  <script type="module" crossorigin src="./assets/index-l2TL-7xB.js"></script>
-  <link rel="modulepreload" crossorigin href="./assets/math.scalar.functions-BJhWOP_u.js">
+  <script type="module" crossorigin src="./assets/index-B3mOhNEE.js"></script>
+  <link rel="modulepreload" crossorigin href="./assets/math.scalar.functions-D-i-XBaP.js">
   <link rel="modulepreload" crossorigin href="./assets/logger-CuBYPcDK.js">
   <link rel="modulepreload" crossorigin href="./assets/observable.pure-BSTfMD_Y.js">
   <link rel="modulepreload" crossorigin href="./assets/shaderStore-D-XQlhUT.js">
-  <link rel="modulepreload" crossorigin href="./assets/precisionDate-CfCevjl-.js">
-  <link rel="modulepreload" crossorigin href="./assets/timingTools-IJ-7VtcJ.js">
+  <link rel="modulepreload" crossorigin href="./assets/domManagement-BqltO0ki.js">
+  <link rel="modulepreload" crossorigin href="./assets/devTools-Bh3wKyVb.js">
+  <link rel="modulepreload" crossorigin href="./assets/tools.functions-CqwhAMxK.js">
   <link rel="modulepreload" crossorigin href="./assets/engineStore-DR9YLb5s.js">
   <link rel="modulepreload" crossorigin href="./assets/performanceConfigurator-UtxC_Odd.js">
+  <link rel="modulepreload" crossorigin href="./assets/precisionDate-Uyb-ubD0.js">
   <link rel="modulepreload" crossorigin href="./assets/internalTexture-DWv5KSLk.js">
-  <link rel="modulepreload" crossorigin href="./assets/thinEngine.pure-B6RDIvi0.js">
+  <link rel="modulepreload" crossorigin href="./assets/abstractEngine.pure-C32mlAAm.js">
   <link rel="modulepreload" crossorigin href="./assets/typeStore-Cu_sj2zM.js">
-  <link rel="modulepreload" crossorigin href="./assets/math.vector.pure-BQHa_fL2.js">
-  <link rel="modulepreload" crossorigin href="./assets/math.color.pure-BxKvMarT.js">
+  <link rel="modulepreload" crossorigin href="./assets/math.vector.pure-zyXXwAl5.js">
+  <link rel="modulepreload" crossorigin href="./assets/math.color.pure-xgyx0pP2.js">
+  <link rel="modulepreload" crossorigin href="./assets/math.plane-B07MhZCR.js">
+  <link rel="modulepreload" crossorigin href="./assets/decorators-BWcttrMP.js">
+  <link rel="modulepreload" crossorigin href="./assets/decorators.serialization-BBjuRdX9.js">
+  <link rel="modulepreload" crossorigin href="./assets/thinEngine.pure-DLgwfLze.js">
   <link rel="modulepreload" crossorigin href="./assets/halfFloat-Ce77JD5z.js">
+  <link rel="modulepreload" crossorigin href="./assets/bufferUtils-BzL83JPG.js">
+  <link rel="modulepreload" crossorigin href="./assets/buffer.pure-BvLm7Bdt.js">
+  <link rel="modulepreload" crossorigin href="./assets/drawWrapper-ny5ZXV2g.js">
+  <link rel="modulepreload" crossorigin href="./assets/effectRenderer.pure-BPWHWCkJ.js">
+  <link rel="modulepreload" crossorigin href="./assets/webRequest-CNElM_Yd.js">
+  <link rel="modulepreload" crossorigin href="./assets/guid-BXdVC_j_.js">
+  <link rel="modulepreload" crossorigin href="./assets/tools.pure-C5F6YRLl.js">
+  <link rel="modulepreload" crossorigin href="./assets/lightConstants-BzlTK8ET.js">
+  <link rel="modulepreload" crossorigin href="./assets/baseTexture.pure-DLjnx0NZ.js">
+  <link rel="modulepreload" crossorigin href="./assets/texture.pure-Cy8hrDZc.js">
+  <link rel="modulepreload" crossorigin href="./assets/smartArray-BRfcgNbX.js">
+  <link rel="modulepreload" crossorigin href="./assets/sceneComponent-CbnOhfVm.js">
+  <link rel="modulepreload" crossorigin href="./assets/renderTargetTexture.pure-wigOHHvN.js">
+  <link rel="modulepreload" crossorigin href="./assets/postProcess.pure-BFW5qICJ.js">
+  <link rel="modulepreload" crossorigin href="./assets/webAudioBaseSubGraph-DjFFcVkT.js">
+  <link rel="modulepreload" crossorigin href="./assets/abstractSoundSource-ChEK4SY2.js">
+  <link rel="modulepreload" crossorigin href="./assets/flowGraphBlock-PEtHMmvB.js">
+  <link rel="modulepreload" crossorigin href="./assets/flowGraphExecutionBlock-DhPbM03Q.js">
+  <link rel="modulepreload" crossorigin href="./assets/flowGraphExecutionBlockWithOutSignal-Bfow1DLg.js">
 </head>
 <body>
     <canvas id="view" tabindex="0"></canvas>
@@ -233,7 +347,7 @@
     <a id="back" href="../../../rooms.html">← Sansara</a>
     <a id="origin" href="https://github.com/Noniv/snowflow_demo" target="_blank" rel="noopener noreferrer" aria-label="Open the original Snowflow repository by Noniv" title="Press Escape, then open the original project">From Snowflow by Noniv ↗</a>
 
-    <div id="hint">click to look &nbsp;·&nbsp; wasd to move &nbsp;·&nbsp; hold space to surf &nbsp;·&nbsp; f1 for settings</div>
+    <div id="hint">click to look &nbsp;·&nbsp; wasd to move &nbsp;·&nbsp; hold space to surf / handbrake &nbsp;·&nbsp; e to drive &nbsp;·&nbsp; f1 for settings</div>
 
     <div id="boot">
         <div class="boot-inner">
