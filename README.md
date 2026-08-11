@@ -83,3 +83,24 @@ Project code is MIT licensed. Third-party assets retain their own licenses.
 ## Direction
 
 Sansara is a prototype for accessible, authored spaces first. The longer-term direction is documented outside the codebase in the local **Sansaara Future Plan** folder: a design direction, a technical path toward photoreal browser scenes, and a staged roadmap for turning the demo into a world-model playground without losing its restraint.
+
+## Branch study: futures, game types, and experiments
+
+### Futures already visible in this branch
+
+- **Renderer future:** `dune2` is now framed as **Dark Snow**, with the branch checkpoint aiming to replace the legacy Three.js handoff with the forked Babylon/WebGPU Snowflow path (`PAUSE_CHECKPOINT.md`).
+- **Animation future:** the next locomotion pass is planned around Quaternius Universal Animation Library clips (`README.md` Animation section, `docs/pipeline.md`).
+- **Pipeline future:** this branch keeps both authored-scene workflows (baked GLB rooms) and procedural generation, so future work can evolve either path without rewriting the selector architecture (`rooms.html`).
+
+### Game types currently supported
+
+- **Procedural exploration:** `dune` and `level0` are generated rooms (`app/rooms/dune.js`, `app/rooms/level0.js`).
+- **Authored liminal scenes:** lobby/room/pool/hill are asset-driven worlds with room-level tuning (`rooms.html` `ROOMS` entries).
+- **Renderer lab world:** `dark snow` (`dune2`) is used as a rendering and atmosphere experiment track.
+
+### Experiments you can add next with minimal friction
+
+- Add a new **procedural room module** and register it in `ROOMS`.
+- Add a new **GLB-authored room** with baked/unlit or live-lit flags and tuning values.
+- Ship rough prototypes as **local-only cards** first (`local: true`) before exposing them in hosted builds.
+- Add another **external renderer experiment** using the existing room handoff pattern used by `dune2`.
