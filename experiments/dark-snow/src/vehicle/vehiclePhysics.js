@@ -120,7 +120,7 @@ export class VehiclePhysics {
         this.chassisContact = false;
         this.recoveredFromUnderworld = false;
         this.maxSpeed = 58 / 3.6;
-        this.acceleration = 4.6;
+        this.acceleration = 7.2;
         this.brake = 8.5;
         this.friction = 0.62;
 
@@ -243,7 +243,7 @@ export class VehiclePhysics {
         // takes over. The old curve started fading almost immediately and the
         // 1,500 kg body felt stuck even at full pedal.
         const torqueBand = 1 - 0.72 * speedRatio ** 1.85;
-        const launchBoost = 1 + 0.22 * (1 - smoothstep(0.08, 0.32, speedRatio));
+        const launchBoost = 1 + 0.55 * (1 - smoothstep(0.10, 0.38, speedRatio));
         const engineForce = this.mass * this.acceleration * torqueBand * launchBoost;
         const totalDriveTorque = opposing || speedLimited
             ? 0 : engineForce * WHEEL_RADIUS * driveInput;

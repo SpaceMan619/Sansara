@@ -383,7 +383,7 @@ export class Vehicle {
         if (!this.loaded) return;
         this.beautyMat.setVector3("sunDir", this.sky.sunDir);
         const frameDt = Math.min(dt, 0.1);
-        this.throttle = expDamp(this.throttle, this.active ? input.moveZ : 0, 3.8, frameDt);
+        this.throttle = expDamp(this.throttle, this.active ? input.moveZ : 0, 7.0, frameDt);
         this.steer = expDamp(this.steer, this.active ? input.moveX : 0, 5.2, frameDt);
         this.physics.setTuning(
             S.vehicleMaxSpeed, S.vehicleAcceleration, S.vehicleBrake, S.vehicleFriction

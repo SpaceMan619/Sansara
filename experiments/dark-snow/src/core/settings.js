@@ -85,7 +85,7 @@ export const S = {
     /** Road speed in km/h; converted to metres/second by the controller. */
     vehicleMaxSpeed: 58,
     /** Forward acceleration in m/s². */
-    vehicleAcceleration: 4.6,
+    vehicleAcceleration: 7.2,
     /** Service brake deceleration in m/s². */
     vehicleBrake: 8.5,
     /** Load-limited tyre friction on packed snow. */
@@ -133,7 +133,7 @@ export const SCHEMA = [
         group: "Vehicle",
         items: [
             { k: "vehicleMaxSpeed", l: "Top speed (km/h)", t: "f", min: 25, max: 120, step: 1 },
-            { k: "vehicleAcceleration", l: "Acceleration", t: "f", min: 1, max: 8, step: 0.1 },
+            { k: "vehicleAcceleration", l: "Acceleration", t: "f", min: 1, max: 12, step: 0.1 },
             { k: "vehicleBrake", l: "Braking", t: "f", min: 3, max: 16, step: 0.5 },
             { k: "vehicleFriction", l: "Snow tyre friction", t: "f", min: 0.45, max: 0.8, step: 0.01 },
         ],
