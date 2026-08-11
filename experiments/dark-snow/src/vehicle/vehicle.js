@@ -1,45 +1,26 @@
 import { LoadAssetContainerAsync } from "@babylonjs/core/Loading/sceneLoader";
 import { TransformNode } from "@babylonjs/core/Meshes/transformNode";
-import { Vector3 } from "@babylonjs/core/Maths/math.vector";
+import { Vector3, Quaternion } from "@babylonjs/core/Maths/math.vector";
 import { Scalar } from "@babylonjs/core/Maths/math.scalar";
 import { ShaderMaterial } from "@babylonjs/core/Materials/shaderMaterial";
 import { ShaderLanguage } from "@babylonjs/core/Materials/shaderLanguage";
+import { RawTexture } from "@babylonjs/core/Materials/Textures/rawTexture";
+import { Constants } from "@babylonjs/core/Engines/constants";
 import "@babylonjs/loaders/glTF";
 
 import { input } from "../core/input.js";
 import { S } from "../core/settings.js";
 import { expDamp } from "../core/camera.js";
 import { EngineSound } from "./engineSound.js";
+import {
+    VehiclePhysics, VEHICLE_SUSPENSION_REST,
+} from "./vehiclePhysics.js";
 
 // The SUV casts into the near cascades only; like the character, its shadow in
 // cascade 2 (330 m at 32 cm/texel) is a smudge indistinguishable from the dune.
 const VEHICLE_CASCADES = 2;
 
-const MAX_REVERSE = 8;
-const REVERSE_ACCEL = 3.1;
-const HANDBRAKE_ACCEL = 13;
-const ROLLING_DRAG = 0.24;
-const AERO_DRAG = 0.0018;
-const GRAVITY = 9.81;
-const WHEEL_BASE = 2.55;
-const MAX_STEER_LOW_SPEED = 0.52;
-const MAX_STEER_HIGH_SPEED = 0.15;
-const WHEEL_RADIUS = 0.48;
 const CHARACTER_RADIUS = 0.52;
-const PHYSICS_STEP = 1 / 120;
-const CHASSIS_CLEARANCE = 0.32;
-
-// Support height is a soft maximum (log-sum-exp) of the tyre/underbody probes
-// rather than a hard Math.max. The crossover where the binding probe switches
-// used to snap the height's derivative and jitter the chassis; this keeps it
-// C1. Per metre — larger is sharper (closer to a true max, less smoothing).
-const SUPPORT_SOFTNESS = 90;
-// The rendered chassis follows the hard-solved collider through critically
-// damped rates instead of snapping to the raw per-frame solve. Height first,
-// then attitude (grounded snappier than airborne).
-const VISUAL_FOLLOW_RATE = 18;
-const GROUNDED_ATTITUDE_RATE = 14;
-const AIRBORNE_ATTITUDE_RATE = 2.2;
 
 const _forward = new Vector3();
 const _right = new Vector3();
@@ -60,7 +41,9 @@ export class Vehicle {
         this.root = null;
         this.meshes = [];
         this.wheels = [];
-        this.frontWheels = [];
+        this.wheelMeshes = new Array(4).fill(null);
+        this.physics = null;
+        this.fallbackAtlas = null;
 
         // Close enough to discover, far enough to keep the opening composition
         // focused on the character and the snow field.
@@ -74,21 +57,9 @@ export class Vehicle {
         this.active = false;
         this.loaded = false;
         this.groundOffset = 0;
-        // Rendered chassis height, critically damped toward the hard collider
-        // (this.position.y) so the collider can stay snappy without the mesh
-        // and the camera-independent body reading as jitter.
-        this.visualY = 0;
         this.steer = 0;
         this.throttle = 0;
         this.grounded = true;
-        this.verticalVelocity = 0;
-        this.pitch = 0;
-        this.roll = 0;
-        this.suspensionCompression = 0;
-        this.suspensionVelocity = 0;
-        this._supportA = { height: 0, pitch: 0, roll: 0 };
-        this._supportB = { height: 0, pitch: 0, roll: 0 };
-        this._wheelRoll = 0;
         this.bodyHalfWidth = 1.05;
         this.bodyHalfLength = 2.18;
         this.frontAxle = 1.3;
@@ -131,7 +102,16 @@ export class Vehicle {
 
     async load(url) {
         try {
-            const container = await LoadAssetContainerAsync(url, this.scene);
+            let container;
+            try {
+                container = await LoadAssetContainerAsync(url, this.scene);
+            } catch (_) {
+                // Keep the checked-in geometry usable when its optional external
+                // colour atlas is absent; a real atlas still takes the normal path.
+                container = await LoadAssetContainerAsync(url, this.scene, {
+                    pluginOptions: { gltf: { skipMaterials: true } },
+                });
+            }
             container.addAllToScene();
 
             const root = new TransformNode("darkSnowVehicleRoot", this.scene);
@@ -199,20 +179,20 @@ export class Vehicle {
             this.root = root;
             this.meshes = meshes;
             this.wheels = wheels;
-            this.frontWheels = wheels.filter((wheel) =>
-                wheel.name.toLowerCase().includes("front")
-            );
+            this.vehicleScale = scale;
+            this._mapWheelMeshes(wheels);
+            this.physics = new VehiclePhysics(this.terrain, this.position, this.facing, {
+                halfWidth: this.bodyHalfWidth,
+                halfLength: this.bodyHalfLength,
+                frontAxle: this.frontAxle,
+                rearAxle: this.rearAxle,
+                halfTrack: this.halfTrack,
+            });
+            this.physics.settleOnTerrain(this.groundOffset);
+            this.velocity = this.physics.velocity;
+            this.position = this.physics.position;
             this.beautyMat.setVector3("sunDir", this.sky.sunDir);
             this.loaded = true;
-            this._sampleSupport(
-                this.position.x, this.position.z, this._supportA
-            );
-            this.position.y = this._supportA.height;
-            // Seed the damped render state so the first frame sits on the ground
-            // conformed, instead of easing up from a flat pose at y=0.
-            this.visualY = this.position.y;
-            this.pitch = this._supportA.pitch;
-            this.roll = this._supportA.roll;
             this._syncVisual(0);
             console.info("[dark-snow] prototype vehicle loaded", {
                 meshes: meshes.map((mesh) => mesh.name),
@@ -251,8 +231,25 @@ export class Vehicle {
         // Kenney authors a closed body, but the low-poly windows are single-sided
         // quads; matching the old StandardMaterial keeps them from vanishing.
         mat.backFaceCulling = false;
-        if (atlas) mat.setTexture("carTex", atlas);
+        if (!atlas && !this.fallbackAtlas) {
+            this.fallbackAtlas = RawTexture.CreateRGBATexture(
+                new Uint8Array([154, 166, 184, 255]),
+                1, 1, this.scene, false, false,
+                Constants.TEXTURE_NEAREST_SAMPLINGMODE
+            );
+        }
+        mat.setTexture("carTex", atlas || this.fallbackAtlas);
         return mat;
+    }
+
+    _mapWheelMeshes(wheels) {
+        for (const mesh of wheels) {
+            const name = mesh.name.toLowerCase();
+            const front = name.includes("front");
+            const left = name.includes("left");
+            const index = front ? (left ? 0 : 1) : (left ? 2 : 3);
+            this.wheelMeshes[index] = mesh;
+        }
     }
 
     /**
@@ -330,7 +327,7 @@ export class Vehicle {
     toggle(character) {
         if (!this.loaded) return false;
         if (this.active) {
-            if (!this.grounded) return false;
+            if (!this.grounded || !this.physics.isUpright()) return false;
             _right.set(Math.cos(this.facing), 0, -Math.sin(this.facing));
             const exitDistance = this.bodyHalfWidth + CHARACTER_RADIUS + 0.75;
             character.position.set(
@@ -345,6 +342,8 @@ export class Vehicle {
             character.speed = 0;
             this.speed = 0;
             this.velocity.setAll(0);
+            this.physics.angularVelocity.setAll(0);
+            for (const wheel of this.physics.wheels) wheel.angularSpeed = 0;
             this.throttle = 0;
             this.steer = 0;
             this.active = false;
@@ -365,278 +364,73 @@ export class Vehicle {
         return true;
     }
 
+    /** GTA-style recovery: keep the location and heading, restore a safe pose. */
+    recover() {
+        if (!this.loaded || !this.active) return false;
+        this.physics.resetUpright();
+        this.throttle = 0;
+        this.steer = 0;
+        this.speed = 0;
+        this.speed01 = 0;
+        this.streak01 = 0;
+        this.grounded = false;
+        this._syncVisual(0);
+        this._updateGauge();
+        return true;
+    }
+
     update(dt, characterPosition) {
         if (!this.loaded) return;
-        // Track the sky's sun so the car's shading stays consistent with the
-        // terrain as the atmosphere solve moves the light through the day.
         this.beautyMat.setVector3("sunDir", this.sky.sunDir);
         const frameDt = Math.min(dt, 0.1);
-        if (!this.active) {
-            this._updatePrompt(characterPosition);
-            this._updateGauge();
-            this._syncVisual(frameDt);
-            return;
-        }
-
-        const steps = Math.max(1, Math.ceil(frameDt / PHYSICS_STEP));
-        const h = frameDt / steps;
-        for (let i = 0; i < steps; i++) this._stepPhysics(h);
-
-        _forward.set(Math.sin(this.facing), 0, Math.cos(this.facing));
+        this.throttle = expDamp(this.throttle, this.active ? input.moveZ : 0, 3.8, frameDt);
+        this.steer = expDamp(this.steer, this.active ? input.moveX : 0, 5.2, frameDt);
+        this.physics.setTuning(
+            S.vehicleMaxSpeed, S.vehicleAcceleration, S.vehicleBrake, S.vehicleFriction
+        );
+        this.physics.update(
+            frameDt, this.throttle, this.steer,
+            this.active ? input.surf : true
+        );
+        const q = this.physics.quaternion;
+        rotateForward(q, _forward);
+        this.facing = Math.atan2(_forward.x, _forward.z);
         this.speed = this.velocity.x * _forward.x + this.velocity.z * _forward.z;
         const maxForward = S.vehicleMaxSpeed / 3.6;
         this.speed01 = Scalar.Clamp(Math.abs(this.speed) / maxForward, 0, 1);
         this.streak01 = Scalar.Clamp((Math.abs(this.speed) - 12) / 14, 0, 1);
         this.lean = -this.steer * this.speed01 * 0.18;
-        this._wheelRoll += (this.speed * frameDt) / WHEEL_RADIUS;
-        this.engine.update(this.speed01, this.throttle, this.grounded);
+        this.grounded = this.physics.grounded;
+        if (this.active) this.engine.update(this.speed01, this.throttle, this.grounded);
         this._syncVisual(frameDt);
         this._updatePrompt(characterPosition);
         this._updateGauge();
     }
 
-    _stepPhysics(h) {
-        _forward.set(Math.sin(this.facing), 0, Math.cos(this.facing));
-        _right.set(Math.cos(this.facing), 0, -Math.sin(this.facing));
-        let longitudinal = this.velocity.x * _forward.x + this.velocity.z * _forward.z;
-        let lateral = this.velocity.x * _right.x + this.velocity.z * _right.z;
-
-        this.throttle = expDamp(this.throttle, input.moveZ, 3.8, h);
-        this.steer = expDamp(this.steer, input.moveX, 5.2, h);
-        const maxForward = Math.max(1, S.vehicleMaxSpeed / 3.6);
-        const ratio = Scalar.Clamp(Math.abs(longitudinal) / maxForward, 0, 1);
-
-        if (this.grounded) {
-            if (this.throttle > 0.02) {
-                if (longitudinal < -0.35) {
-                    longitudinal = approach(longitudinal, 0, S.vehicleBrake * this.throttle * h);
-                } else {
-                    const engine = S.vehicleAcceleration
-                        * (1 - 0.72 * Math.pow(ratio, 1.65));
-                    longitudinal += engine * this.throttle * h;
-                }
-            } else if (this.throttle < -0.02) {
-                if (longitudinal > 0.35) {
-                    longitudinal = approach(longitudinal, 0, S.vehicleBrake * -this.throttle * h);
-                } else {
-                    const reverseRatio = Scalar.Clamp(Math.abs(longitudinal) / MAX_REVERSE, 0, 1);
-                    longitudinal -= REVERSE_ACCEL * (1 - 0.7 * reverseRatio) * -this.throttle * h;
-                }
-            } else {
-                const drag = ROLLING_DRAG + AERO_DRAG * longitudinal * longitudinal;
-                longitudinal = approach(longitudinal, 0, drag * h);
-            }
-
-            // Space becomes a handbrake in the SUV. Normal tyre grip scrubs
-            // sideslip progressively; the handbrake releases the rear so a
-            // turn rotates into a drift instead of snapping like a toy car.
-            if (input.surf) longitudinal = approach(longitudinal, 0, HANDBRAKE_ACCEL * h);
-            const grip = input.surf
-                ? 1.35
-                : Scalar.Lerp(S.vehicleGrip * 1.3, S.vehicleGrip * 0.5, ratio);
-            lateral *= Math.exp(-grip * h);
-
-            const frontGround = this.terrain.heightAt(
-                this.position.x + _forward.x, this.position.z + _forward.z
-            );
-            const rearGround = this.terrain.heightAt(
-                this.position.x - _forward.x, this.position.z - _forward.z
-            );
-            const grade = (frontGround - rearGround) * 0.5;
-            longitudinal -= 9.81 * grade * h;
-
-            const steerLimit = Scalar.Lerp(
-                MAX_STEER_LOW_SPEED, MAX_STEER_HIGH_SPEED, ratio
-            );
-            const steerAngle = this.steer * steerLimit;
-            if (Math.abs(longitudinal) > 0.25) {
-                this.facing += (longitudinal / WHEEL_BASE)
-                    * Math.tan(steerAngle) * (input.surf ? 1.35 : 1) * h;
-            }
-
-            longitudinal = Scalar.Clamp(longitudinal, -MAX_REVERSE, maxForward);
-            _forward.set(Math.sin(this.facing), 0, Math.cos(this.facing));
-            _right.set(Math.cos(this.facing), 0, -Math.sin(this.facing));
-            this.velocity.x = _forward.x * longitudinal + _right.x * lateral;
-            this.velocity.z = _forward.z * longitudinal + _right.z * lateral;
-
-            this._sampleSupport(
-                this.position.x, this.position.z, this._supportA
-            );
-            const currentSupport = this._supportA.height;
-            const nextX = this.position.x + this.velocity.x * h;
-            const nextZ = this.position.z + this.velocity.z * h;
-            this._sampleSupport(nextX, nextZ, this._supportB);
-            const nextSupport = this._supportB.height;
-            const surfaceVelocity = (nextSupport - currentSupport) / h;
-
-            // Look ahead along the current tangent. If the physical ballistic
-            // path sits above the upcoming support surface, the normal force
-            // has vanished and the tyres must release from the snow.
-            const lookTime = Scalar.Lerp(0.10, 0.22, ratio);
-            this._sampleSupport(
-                nextX + this.velocity.x * lookTime,
-                nextZ + this.velocity.z * lookTime,
-                this._supportA
-            );
-            const tangentAhead = this.position.y
-                + this.verticalVelocity * lookTime
-                // Deliberately lighter anticipation than the airborne gravity
-                // step. This approximates suspension unloading at a crest and
-                // gives readable GTA-like airtime on the broad snow dunes.
-                - 0.5 * GRAVITY * lookTime * lookTime * 0.28;
-            const releaseAtCrest = Math.abs(longitudinal) > 5
-                && tangentAhead > this._supportA.height + S.vehicleCrestRelease;
-
-            this.position.x = nextX;
-            this.position.z = nextZ;
-            this.verticalVelocity -= GRAVITY * h;
-            const ballisticY = this.position.y + this.verticalVelocity * h;
-            if (!releaseAtCrest && ballisticY <= nextSupport) {
-                this.position.y = nextSupport;
-                this.verticalVelocity = surfaceVelocity;
-            } else {
-                this.position.y = ballisticY;
-                this.grounded = false;
-            }
-        } else {
-            this._sampleSupport(
-                this.position.x, this.position.z, this._supportA
-            );
-            const nextX = this.position.x + this.velocity.x * h;
-            const nextZ = this.position.z + this.velocity.z * h;
-            this._sampleSupport(nextX, nextZ, this._supportB);
-            const surfaceVelocity = (
-                this._supportB.height - this._supportA.height
-            ) / h;
-            this.position.x = nextX;
-            this.position.z = nextZ;
-            this.verticalVelocity -= GRAVITY * h;
-            this.position.y += this.verticalVelocity * h;
-            if (
-                this.position.y <= this._supportB.height
-                && this.verticalVelocity <= surfaceVelocity
-            ) {
-                const impact = surfaceVelocity - this.verticalVelocity;
-                this.position.y = this._supportB.height;
-                this.grounded = true;
-                this.suspensionVelocity += Math.min(0.48, impact * 0.045);
-                this.verticalVelocity = surfaceVelocity;
-                const landingLoss = Math.max(0.72, 1 - impact * 0.012);
-                this.velocity.x *= landingLoss;
-                this.velocity.z *= landingLoss;
-            }
-        }
-
-        this.suspensionVelocity += (-28 * this.suspensionCompression
-            - 7.5 * this.suspensionVelocity) * h;
-        this.suspensionCompression += this.suspensionVelocity * h;
-        this.suspensionCompression = Scalar.Clamp(
-            this.suspensionCompression, -0.06, 0.32
-        );
-    }
-
-    _sampleSupport(x, z, out) {
-        _forward.set(Math.sin(this.facing), 0, Math.cos(this.facing));
-        _right.set(Math.cos(this.facing), 0, -Math.sin(this.facing));
-        const heightAt = (forwardOffset, rightOffset) => this.terrain.heightAt(
-            x + _forward.x * forwardOffset + _right.x * rightOffset,
-            z + _forward.z * forwardOffset + _right.z * rightOffset
-        );
-        const frontPlus = heightAt(this.frontAxle, this.halfTrack);
-        const frontMinus = heightAt(this.frontAxle, -this.halfTrack);
-        const rearPlus = heightAt(this.rearAxle, this.halfTrack);
-        const rearMinus = heightAt(this.rearAxle, -this.halfTrack);
-        const frontY = (frontPlus + frontMinus) * 0.5;
-        const rearY = (rearPlus + rearMinus) * 0.5;
-        const plusY = (frontPlus + rearPlus) * 0.5;
-        const minusY = (frontMinus + rearMinus) * 0.5;
-        const wheelbase = this.frontAxle - this.rearAxle;
-        const rawForwardSlope = (frontY - rearY) / wheelbase;
-        const rawSideSlope = (plusY - minusY) / (this.halfTrack * 2);
-
-        // Limit only the rendered attitude, then recompute the vertical support
-        // required by that exact limited plane. Visual pose and collision can
-        // no longer disagree on steep slopes.
-        out.pitch = Scalar.Clamp(-Math.atan(rawForwardSlope), -0.46, 0.46);
-        out.roll = Scalar.Clamp(Math.atan(rawSideSlope), -0.28, 0.28);
-        const forwardSlope = -Math.tan(out.pitch);
-        const sideSlope = Math.tan(out.roll);
-        const contribution = (forwardOffset, rightOffset) =>
-            forwardSlope * forwardOffset + sideSlope * rightOffset;
-        const wheelClearance = 0.015;
-
-        // Solve the minimum root height satisfying every authored tyre pivot.
-        // The additional body probes use the GLB's real bumper extents and its
-        // measured 0.32 m underbody clearance.
-        out.height = softMax(SUPPORT_SOFTNESS, [
-            frontPlus - contribution(this.frontAxle, this.halfTrack) + wheelClearance,
-            frontMinus - contribution(this.frontAxle, -this.halfTrack) + wheelClearance,
-            rearPlus - contribution(this.rearAxle, this.halfTrack) + wheelClearance,
-            rearMinus - contribution(this.rearAxle, -this.halfTrack) + wheelClearance,
-            heightAt(0, 0) - CHASSIS_CLEARANCE,
-            heightAt(this.bodyFront, 0)
-                - contribution(this.bodyFront, 0) - CHASSIS_CLEARANCE,
-            heightAt(this.bodyRear, 0)
-                - contribution(this.bodyRear, 0) - CHASSIS_CLEARANCE,
-            heightAt(this.bodyFront, this.bodyHalfWidth)
-                - contribution(this.bodyFront, this.bodyHalfWidth) - CHASSIS_CLEARANCE,
-            heightAt(this.bodyFront, -this.bodyHalfWidth)
-                - contribution(this.bodyFront, -this.bodyHalfWidth) - CHASSIS_CLEARANCE,
-            heightAt(this.bodyRear, this.bodyHalfWidth)
-                - contribution(this.bodyRear, this.bodyHalfWidth) - CHASSIS_CLEARANCE,
-            heightAt(this.bodyRear, -this.bodyHalfWidth)
-                - contribution(this.bodyRear, -this.bodyHalfWidth) - CHASSIS_CLEARANCE,
-        ]);
-        return out;
-    }
-
     _syncVisual(dt = 0) {
         if (!this.root) return;
-        this._sampleSupport(
-            this.position.x, this.position.z, this._supportA
-        );
-
-        // The collider (this.position.y) is still solved hard each frame so
-        // collision and the camera stay correct; the *rendered* chassis follows
-        // it through a critically damped spring, so the soft-max crossovers and
-        // per-substep snaps read as suspension travel instead of jitter. The
-        // simulated suspensionCompression finally shows here too, as landing
-        // squash on top of that follow.
-        this.visualY = expDamp(this.visualY, this.position.y, VISUAL_FOLLOW_RATE, dt);
+        const pose = this.physics.visualPosition;
         this.root.position.set(
-            this.position.x,
-            this.visualY + this.groundOffset - this.suspensionCompression,
-            this.position.z
+            pose.x,
+            pose.y + this.physics.modelYOffset,
+            pose.z
         );
-        const targetPitch = this.grounded
-            ? this._supportA.pitch
-            : Scalar.Clamp(-this.verticalVelocity * 0.018, -0.16, 0.16);
-        const targetRoll = this.grounded ? this._supportA.roll : -this.steer * 0.08;
-        // Damp attitude in both states. Grounded easing may differ from the
-        // solved plane by sub-centimetre bumper travel — that is exactly what
-        // suspension is — and it turns the slope chatter into a smooth lean.
-        const attitudeRate = this.grounded
-            ? GROUNDED_ATTITUDE_RATE : AIRBORNE_ATTITUDE_RATE;
-        this.pitch = expDamp(this.pitch, targetPitch, attitudeRate, dt);
-        this.roll = expDamp(this.roll, targetRoll, attitudeRate, dt);
-        this.root.rotation.x = this.pitch;
-        // Kenney's SUV points down +Z. Keeping the visual and physical forward
-        // axes identical makes W/ArrowUp visibly drive through the windscreen,
-        // rather than moving the model boot-first.
-        this.root.rotation.y = this.facing;
-        this.root.rotation.z = this.roll;
+        if (!this.root.rotationQuaternion) this.root.rotationQuaternion = new Quaternion();
+        this.root.rotationQuaternion.copyFrom(this.physics.visualQuaternion);
 
-        for (const wheel of this.wheels) {
-            const base = wheel.metadata.baseRotation;
-            const basePosition = wheel.metadata.basePosition;
-            // Wheels stay rigidly attached to their authored axle positions.
-            // A future high-resolution rig can expose suspension bones; this
-            // low-poly GLB cannot safely fake them through mesh-local offsets.
-            wheel.position.copyFrom(basePosition);
-            wheel.rotation.x = base.x + this._wheelRoll;
-            wheel.rotation.y = base.y + (this.frontWheels.includes(wheel) ? -this.steer * 0.48 : 0);
-            wheel.rotation.z = base.z;
+        for (let i = 0; i < 4; i++) {
+            const mesh = this.wheelMeshes[i];
+            if (!mesh) continue;
+            const state = this.physics.wheels[i];
+            const base = mesh.metadata.baseRotation;
+            const basePosition = mesh.metadata.basePosition;
+            mesh.position.copyFrom(basePosition);
+            const travel = VEHICLE_SUSPENSION_REST - state.compression;
+            const restTravel = VEHICLE_SUSPENSION_REST;
+            mesh.position.y += (restTravel - travel) / this.vehicleScale;
+            mesh.rotation.x = base.x + state.rotation;
+            mesh.rotation.y = base.y - state.steerAngle;
+            mesh.rotation.z = base.z;
         }
     }
 
@@ -646,7 +440,9 @@ export class Vehicle {
         const kmh = Math.round(Math.abs(this.speed) * 3.6);
         this.gaugeValue.textContent = String(kmh);
         this.gaugeFill.style.width = `${Math.min(100, kmh / S.vehicleMaxSpeed * 100)}%`;
-        this.gaugeState.textContent = !this.grounded
+        this.gaugeState.textContent = this.physics?.needsRecovery()
+            ? "ROLL"
+            : !this.grounded
             ? "AIR"
             : this.speed < -0.2 ? "R" : "D";
     }
@@ -654,7 +450,9 @@ export class Vehicle {
     _updatePrompt(characterPosition) {
         if (!this.loaded) return;
         if (this.active) {
-            this.prompt.textContent = "E  ·  step out";
+            this.prompt.textContent = this.physics.needsRecovery()
+                ? "R  ·  recover SUV"
+                : "E  ·  step out";
             this.prompt.classList.add("show");
         } else if (this.canEnter(characterPosition)) {
             this.prompt.textContent = "E  ·  drive SUV";
@@ -727,21 +525,9 @@ export class Vehicle {
     }
 }
 
-function approach(value, target, amount) {
-    if (value < target) return Math.min(target, value + amount);
-    if (value > target) return Math.max(target, value - amount);
-    return target;
-}
-
-// Smooth maximum (log-sum-exp). Continuous in its derivative through the
-// crossover where the largest input changes — unlike Math.max, whose kink there
-// snapped the support height and jittered the chassis. Biases the result upward
-// by at most ln(activeTerms)/k, a fixed sub-centimetre lift under the wheels.
-function softMax(k, values) {
-    let m = -Infinity;
-    for (const v of values) if (v > m) m = v;
-    if (m === -Infinity) return 0;
-    let sum = 0;
-    for (const v of values) sum += Math.exp(k * (v - m));
-    return m + Math.log(sum) / k;
+function rotateForward(q, out) {
+    const x = 2 * (q.x * q.z + q.w * q.y);
+    const y = 2 * (q.y * q.z - q.w * q.x);
+    const z = 1 - 2 * (q.x * q.x + q.y * q.y);
+    out.set(x, y, z);
 }

@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 480" role="img" aria-labelledby="title desc">
+  <title id="title">Pale Horizon</title>
+  <desc id="desc">A fighter aircraft crossing a pale low-sun horizon.</desc>
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#73878d"/>
+      <stop offset=".58" stop-color="#b9c2c0"/>
+      <stop offset="1" stop-color="#6d7b79"/>
+    </linearGradient>
+    <radialGradient id="sun">
+      <stop offset="0" stop-color="#ffe7b2" stop-opacity=".95"/>
+      <stop offset=".2" stop-color="#efc77f" stop-opacity=".75"/>
+      <stop offset="1" stop-color="#dfb96e" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="320" height="480" fill="url(#sky)"/>
+  <circle cx="244" cy="189" r="95" fill="url(#sun)"/>
+  <path d="M0 300 Q74 267 147 297 T320 274 V480 H0Z" fill="#485855"/>
+  <path d="M0 326 Q70 297 158 322 T320 302" fill="none" stroke="#d9ddcf" stroke-opacity=".25"/>
+  <g transform="translate(159 236) rotate(-9)" fill="#1e292d" stroke="#dbe1dd" stroke-opacity=".22">
+    <path d="M0-72 9-30 49-1 51 10 13 2 20 52 8 57 0 32 -8 57 -20 52 -13 2 -51 10 -49-1 -9-30Z"/>
+    <path d="M-12 20 -28 40 -18 44 -2 30 2 30 18 44 28 40 12 20Z"/>
+  </g>
+  <path d="M25 218 H109 M211 218 H295" stroke="#eef1e7" stroke-opacity=".52"/>
+</svg>

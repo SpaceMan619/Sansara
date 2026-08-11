@@ -1,0 +1,14 @@
+{
+  "metadataStatus": "pending-package-inspection",
+  "title": "F22 Raptor FREE",
+  "creator": "NLM",
+  "creatorUrl": "https://sketchfab.com/NLM-Group",
+  "sourceUrl": "https://sketchfab.com/3d-models/f22-raptor-free-2a64abf0866a405c865466c7642ca689",
+  "license": {
+    "name": "Creative Commons Attribution 4.0 International",
+    "spdx": "CC-BY-4.0",
+    "url": "https://creativecommons.org/licenses/by/4.0/"
+  },
+  "creditText": "\"F22 Raptor FREE\" by NLM, licensed under CC BY 4.0. Source: https://sketchfab.com/3d-models/f22-raptor-free-2a64abf0866a405c865466c7642ca689",
+  "notes": "Model-specific structure, animation, texture, and mesh metadata remain pending until the official Sketchfab package is supplied and inspected."
+}

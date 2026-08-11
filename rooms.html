@@ -43,12 +43,12 @@
   #travel .release{ position:absolute; bottom:max(28px,6vh); left:max(24px,4vw); z-index:1;
            font:600 9px/1 system-ui,sans-serif; letter-spacing:.18em; text-transform:uppercase;
            color:rgba(36,48,74,.42); }
-  #travel .rail{ position:relative; z-index:1; display:flex; gap:13px; padding:26px 28px;
-                 width:min(1180px,96vw); overflow-x:auto; scrollbar-width:none;
-                 scroll-snap-type:x proximity; box-sizing:border-box; }
-  @media (min-width:1240px){ #travel .rail{ justify-content:center; } }
+  #travel .rail{ position:relative; z-index:1; display:flex; gap:13px; padding:26px max(28px,calc(50vw - 80px));
+                 width:100vw; max-width:none; overflow-x:auto; scrollbar-width:none;
+                 scroll-snap-type:x mandatory; scroll-padding-inline:calc(50vw - 80px);
+                 overscroll-behavior-inline:contain; box-sizing:border-box; }
   #travel .rail::-webkit-scrollbar{ display:none; }
-  .card{ position:relative; flex:1 0 148px; min-width:148px; max-width:160px; height:230px;
+  .card{ position:relative; flex:0 0 160px; width:160px; height:230px;
          scroll-snap-align:center; cursor:pointer; padding:0;
          border-radius:24px; overflow:hidden; text-align:left;
          background:rgba(255,255,255,.48); border:1px solid rgba(255,255,255,.84);
@@ -64,7 +64,7 @@
   #travel .card:nth-child(1){ transition-delay:.02s } #travel .card:nth-child(2){ transition-delay:.05s }
   #travel .card:nth-child(3){ transition-delay:.08s } #travel .card:nth-child(4){ transition-delay:.11s }
   #travel .card:nth-child(5){ transition-delay:.14s } #travel .card:nth-child(6){ transition-delay:.17s }
-  #travel .card:nth-child(7){ transition-delay:.20s }
+  #travel .card:nth-child(7){ transition-delay:.20s } #travel .card:nth-child(8){ transition-delay:.23s }
   .card .swatch{ position:absolute; inset:0; opacity:.9; background-size:cover;
                  background-position:center;
                  background-image:radial-gradient(circle at 35% 24%, rgba(255,255,255,.9), transparent 32%),
@@ -82,6 +82,8 @@
              color:#24304a; text-transform:lowercase; }
   .card .bl{ display:block; margin-top:6px; font-size:10.5px; line-height:1.4;
              color:rgba(36,48,74,.58); }
+  .card .lab{ display:inline-block; margin-bottom:7px; font:650 7px/1 system-ui,sans-serif;
+              letter-spacing:.14em; text-transform:uppercase; color:rgba(36,48,74,.58); }
   .card.here .nm::after{ content:'  here'; font:600 8.5px/1 system-ui,sans-serif;
                          letter-spacing:.18em; text-transform:uppercase; color:#6f91d8; }
   #travel[data-input="pointer"] .card:hover{ transform:translate3d(0,-5px,0); box-shadow:0 0 0 1px rgba(127,168,255,.34); }
@@ -101,8 +103,8 @@
   @keyframes travelDrift{ 50%{ transform:translate3d(7%,-5%,0) scale(1.12); } }
   @media (max-width:640px){
     #travel .travel-head{ top:28px; }
-    #travel .rail{ padding:24px; }
-    .card{ flex-basis:154px; min-width:154px; height:214px; border-radius:21px; }
+    #travel .rail{ padding:24px max(24px,calc(50vw - 77px)); scroll-padding-inline:calc(50vw - 77px); }
+    .card{ flex-basis:154px; width:154px; height:214px; border-radius:21px; }
     .card .bl{ display:none; }
   }
   @media (prefers-reduced-motion: reduce){
@@ -362,6 +364,14 @@ const ROOMS = {
     creditUrl: 'https://github.com/Noniv/snowflow_demo',
     tint: '#b8c9d8',
   },
+  paleHorizon: {
+    label: 'pale horizon',
+    blurb: 'A full-physics flight study beneath a low, pale sun.',
+    badge: 'Flight lab / Tech demo',
+    credit: 'F-22 Raptor Free by NLM — CC BY 4.0',
+    creditUrl: 'https://sketchfab.com/3d-models/f22-raptor-free-2a64abf0866a405c865466c7642ca689',
+    tint: '#9ba9ad',
+  },
   level0: {
     label: 'level 0', module: 'app/rooms/level0.js',
     blurb: 'Endless yellow rooms, generated fresh each visit.',
@@ -430,6 +440,8 @@ const ROOMS = {
 };
 const params = new URLSearchParams(location.search);
 let roomKey = ROOMS[params.get('room')] ? params.get('room') : 'dune';
+let travelOriginKey = ROOMS[params.get('current')] ? params.get('current') : null;
+const AUTO_OPEN_TRAVEL = params.get('travel') === '1';
 
 /* ========================= tuning params ======================== */
 const TUNE = {
@@ -1587,6 +1599,7 @@ function flashHud(ms = 4200){
 const DEFAULT_THUMBS = Object.freeze({
   dune: 'assets/thumbnails/dune.jpg',
   dune2: 'assets/thumbnails/dark-snow.jpg',
+  paleHorizon: 'assets/thumbnails/pale-horizon.svg',
   level0: 'assets/thumbnails/level0.jpg',
   backrooms: 'assets/thumbnails/backrooms.jpg',
   lobby: 'assets/thumbnails/lobby.jpg',
@@ -1662,6 +1675,11 @@ const REDUCE_MOTION = matchMedia('(prefers-reduced-motion: reduce)');
 const roomKeys = ()=>Object.keys(ROOMS).filter(k=>IS_LOCAL || !ROOMS[k].local);
 let travelOpen = false, travelIdx = 0, switching = false, travelCommitted = false;
 let pointerX = NaN, pointerY = NaN, travelInput = 'keyboard';
+// A Tab key released after cross-page navigation can arrive in this document.
+// Ignore that one release so a standalone world does not immediately bounce
+// back into itself before the user has had a chance to move through the cards.
+let guardExternalTabRelease = AUTO_OPEN_TRAVEL;
+const travelCurrentKey = ()=>travelOriginKey || roomKey;
 function setTravelInput(source){
   travelInput = source;
   document.getElementById('travel').dataset.input = source;
@@ -1725,7 +1743,8 @@ function markSelected(scroll=false){
     el.setAttribute('aria-pressed', String(i===travelIdx));
     if (scroll && i===travelIdx){
       const rail = document.getElementById('rail');
-      const left = el.offsetLeft - (rail.clientWidth - el.offsetWidth)/2;
+      const wanted = el.offsetLeft - (rail.clientWidth - el.offsetWidth)/2;
+      const left = Math.max(0, Math.min(wanted, rail.scrollWidth - rail.clientWidth));
       rail.scrollTo({ left, behavior:REDUCE_MOTION.matches?'auto':'smooth' });
     }
   });
@@ -1740,6 +1759,7 @@ function selectTravel(i, {scroll=false, sound=true, source='keyboard'}={}){
   const next = (i % count + count) % count;
   setTravelInput(source);
   if (next === travelIdx) return;
+  guardExternalTabRelease = false;
   travelIdx = next;
   markSelected(scroll);
   if (sound) soundMove();
@@ -1751,15 +1771,15 @@ function buildTravel(){
     const cfg = ROOMS[k];
     const el = document.createElement('button');
     el.type = 'button';
-    el.className = 'card' + (k===roomKey ? ' here' : '') + (i===travelIdx ? ' sel' : '');
+    el.className = 'card' + (k===travelCurrentKey() ? ' here' : '') + (i===travelIdx ? ' sel' : '');
     el.setAttribute('aria-label', `${cfg.label}. ${cfg.blurb || ''}`);
-    if (k===roomKey) el.setAttribute('aria-current','true');
+    if (k===travelCurrentKey()) el.setAttribute('aria-current','true');
     el.style.setProperty('--tint', cfg.tint || tintFor(k));
     const shot = thumbFor(k);
     el.innerHTML = `<span class="swatch${shot?' shot':''}"${shot?` style="--shot:url('${shot}')"`:''}></span>
       <span class="veil"></span>
       <span class="idx">${String(i+1).padStart(2,'0')}</span>
-      <span class="txt"><span class="nm">${cfg.label}</span>
+      <span class="txt">${cfg.badge ? `<span class="lab">${cfg.badge}</span>` : ''}<span class="nm">${cfg.label}</span>
       <span class="bl">${cfg.blurb || ''}</span></span>`;
     el.onclick = ()=>{ if (travelInput === 'pointer') commitTravel(k); };
     el.onpointerdown = ()=>{ setTravelInput('pointer'); audioReady(); };
@@ -1782,11 +1802,15 @@ function openTravel(){
   travelOpen = true;
   travelCommitted = false;
   setTravelInput('keyboard');
-  travelIdx = Math.max(0, roomKeys().indexOf(roomKey));
+  travelIdx = Math.max(0, roomKeys().indexOf(travelCurrentKey()));
   buildTravel();
   const travel = document.getElementById('travel');
   travel.classList.add('on');
   travel.setAttribute('aria-hidden','false');
+  // Eight worlds no longer fit in one desktop row. Centre the current card
+  // after the rail has a measured width so every entry, including the two
+  // ends, can be reached and seen immediately.
+  requestAnimationFrame(()=>markSelected(true));
   document.getElementById('hud').classList.remove('show');
 }
 function closeTravel(){
@@ -1799,7 +1823,11 @@ function commitTravel(k){
   if (!travelOpen || travelCommitted || switching || !ROOMS[k]) return;
   travelCommitted = true;
   closeTravel();
-  if (k === roomKey) return;
+  travelOriginKey = null;
+  if (k === roomKey){
+    history.replaceState(null,'',`?room=${k}`);
+    return;
+  }
   soundEnter();
   goTo(k);
 }
@@ -1833,6 +1861,12 @@ async function goTo(k){
       location.assign(target.href);
       return;
     }
+    if (k === 'paleHorizon') {
+      const target = new URL('experiments/pale-horizon/dist/index.html', location.href);
+      target.searchParams.set('from', 'sansara');
+      location.assign(target.href);
+      return;
+    }
     await loadRoom(k);
     wipe.classList.add('reveal');
     await new Promise(r=>setTimeout(r, REDUCE_MOTION.matches ? 60 : 720));
@@ -1844,7 +1878,10 @@ async function goTo(k){
 }
 
 addEventListener('keydown', e=>{
-  if (e.code === 'Tab'){ e.preventDefault(); audioReady(); openTravel(); return; }
+  if (e.code === 'Tab'){
+    e.preventDefault(); audioReady();
+    openTravel(); return;
+  }
   if (!travelOpen) return;
   const ks = roomKeys();
   if (e.code === 'ArrowRight'){ selectTravel(travelIdx+1, {scroll:true}); e.preventDefault(); }
@@ -1854,6 +1891,7 @@ addEventListener('keydown', e=>{
 });
 addEventListener('keyup', e=>{
   if (e.code !== 'Tab' || !travelOpen) return;
+  if (guardExternalTabRelease){ guardExternalTabRelease = false; return; }
   const k = roomKeys()[travelIdx];
   commitTravel(k);
 });
@@ -2000,6 +2038,7 @@ addEventListener('resize',()=>{ camera.aspect=innerWidth/innerHeight;
     await loadRoom(roomKey);
     buildPanel();
     renderer.setAnimationLoop(safeTick);
+    if (AUTO_OPEN_TRAVEL) requestAnimationFrame(openTravel);
   } catch(err){
     document.getElementById('load').textContent = 'startup error: ' + err.message;
     console.error(err);

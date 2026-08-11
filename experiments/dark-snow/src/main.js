@@ -40,6 +40,17 @@ import * as loading from "./core/loading.js";
 // ------------------------------------------------------- module-scope scratch
 const _vel = new Vector3();
 
+function openSansaraSelector(currentWorld) {
+    const marker = "/experiments/";
+    const markerAt = location.pathname.indexOf(marker);
+    const rootPath = markerAt >= 0 ? location.pathname.slice(0, markerAt + 1) : "/";
+    const target = new URL(`${rootPath}rooms.html`, location.origin);
+    target.searchParams.set("travel", "1");
+    target.searchParams.set("current", currentWorld);
+    document.exitPointerLock?.();
+    location.assign(target.href);
+}
+
 async function boot() {
     const canvas = /** @type {HTMLCanvasElement} */ (document.getElementById("view"));
 
@@ -188,6 +199,8 @@ async function boot() {
         onToggleVehicle: () => {
             if (vehicle.toggle(character)) syncCharacterVisibility();
         },
+        onRecoverVehicle: () => vehicle.recover(),
+        onOpenWorlds: () => openSansaraSelector("dune2"),
     });
 
     // ------------------------------------------------------------- warm-up

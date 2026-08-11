@@ -17,3 +17,7 @@ docs/*-design.md
 assets/scenes/vr_liminal_room_baked.glb
 output/pool_baked.glb
 inspect.html
+
+# Local aircraft pipeline outputs are regenerated from the credited source.
+# Dark Snow's Vite build mirrors public files into dist, so ignore that copy too.
+experiments/dark-snow/dist/vehicles/aircraft/

@@ -1,129 +1,153 @@
 /**
- * Procedural engine + tyre audio for the SUV.
+ * Recorded SUV audio.
  *
- * No samples, matching the demo's zero-asset ethos: a small oscillator bank
- * whose pitch tracks speed through a fake gearbox, plus a filtered noise bed for
- * tyre/wind. The AudioContext is created lazily on the first drive so it starts
- * inside the `E` key's user gesture (browsers suspend contexts created cold).
+ * A four-second stereo Opel engine loop carries the mechanical detail. Speed,
+ * throttle and a smoothed gearbox drive playback rate, tone and load without
+ * putting synthetic oscillators back at the centre of the mix.
  */
 export class EngineSound {
     constructor() {
         this.ctx = null;
         this.started = false;
+        this.loading = null;
+        this.engineSource = null;
+        this.engineGain = null;
+        this.rpm = 0.12;
+        this.lastUpdateTime = 0;
     }
 
     _ensure() {
         if (this.ctx) return;
         const AC = window.AudioContext || window.webkitAudioContext;
         if (!AC) return;
-        const ctx = new AC();
+        let ctx;
+        try { ctx = new AC({ latencyHint: "interactive" }); }
+        catch (_) { ctx = new AC(); }
         this.ctx = ctx;
 
+        const compressor = ctx.createDynamicsCompressor();
+        compressor.threshold.value = -16;
+        compressor.knee.value = 12;
+        compressor.ratio.value = 3;
+        compressor.attack.value = 0.008;
+        compressor.release.value = 0.18;
+        compressor.connect(ctx.destination);
+
         this.master = ctx.createGain();
-        this.master.gain.value = 0;
-        this.master.connect(ctx.destination);
+        this.master.gain.value = 0.0001;
+        this.master.connect(compressor);
 
-        // Engine: two detuned sawtooths + a square sub-octave through a lowpass
-        // that opens with load. Sawtooths carry the harmonic buzz; the sub gives
-        // it weight.
-        this.filter = ctx.createBiquadFilter();
-        this.filter.type = "lowpass";
-        this.filter.frequency.value = 700;
-        this.filter.Q.value = 6;
-        this.filter.connect(this.master);
+        this.engineBus = ctx.createGain();
+        this.engineBus.gain.value = 0.72;
+        this.engineTone = ctx.createBiquadFilter();
+        this.engineTone.type = "lowpass";
+        this.engineTone.frequency.value = 2600;
+        this.engineTone.Q.value = 0.55;
+        this.engineBus.connect(this.engineTone).connect(this.master);
 
-        this.oscs = [];
-        for (const detune of [-7, 7]) {
-            const o = ctx.createOscillator();
-            o.type = "sawtooth";
-            o.detune.value = detune;
-            const g = ctx.createGain();
-            g.gain.value = 0.5;
-            o.connect(g);
-            g.connect(this.filter);
-            o.start();
-            this.oscs.push(o);
+        // A quiet, filtered snow/road bed carries speed without pretending to
+        // be the engine. A seeded buffer keeps recordings and tests repeatable.
+        const frames = ctx.sampleRate * 2;
+        const noiseBuffer = ctx.createBuffer(1, frames, ctx.sampleRate);
+        const data = noiseBuffer.getChannelData(0);
+        let seed = 0x51f15e;
+        for (let i = 0; i < frames; i++) {
+            seed = (seed * 1664525 + 1013904223) >>> 0;
+            data[i] = seed / 0x80000000 - 1;
         }
-        this.sub = ctx.createOscillator();
-        this.sub.type = "square";
-        const subGain = ctx.createGain();
-        subGain.gain.value = 0.32;
-        this.sub.connect(subGain);
-        subGain.connect(this.filter);
-        this.sub.start();
+        this.road = ctx.createBufferSource();
+        this.road.buffer = noiseBuffer;
+        this.road.loop = true;
+        this.roadFilter = ctx.createBiquadFilter();
+        this.roadFilter.type = "bandpass";
+        this.roadFilter.frequency.value = 820;
+        this.roadFilter.Q.value = 0.72;
+        this.roadGain = ctx.createGain();
+        this.roadGain.gain.value = 0;
+        this.road.connect(this.roadFilter).connect(this.roadGain).connect(this.master);
+        this.road.start();
 
-        // Tyre / wind bed: a looped noise buffer through a bandpass that rises
-        // with speed.
-        const len = ctx.sampleRate * 2;
-        const buf = ctx.createBuffer(1, len, ctx.sampleRate);
-        const data = buf.getChannelData(0);
-        for (let i = 0; i < len; i++) data[i] = Math.random() * 2 - 1;
-        this.noise = ctx.createBufferSource();
-        this.noise.buffer = buf;
-        this.noise.loop = true;
-        this.noiseFilter = ctx.createBiquadFilter();
-        this.noiseFilter.type = "bandpass";
-        this.noiseFilter.frequency.value = 1200;
-        this.noiseGain = ctx.createGain();
-        this.noiseGain.gain.value = 0;
-        this.noise.connect(this.noiseFilter);
-        this.noiseFilter.connect(this.noiseGain);
-        this.noiseGain.connect(this.master);
-        this.noise.start();
+        this.loading = this._loadRecording().catch((error) => {
+            console.warn("[dark-snow] vehicle recording unavailable", error);
+        });
     }
 
-    /** Fade the engine in — call on entering the car (a user gesture). */
+    async _loadRecording() {
+        const name = "engine-loop.mp3";
+        const url = new URL(`audio/vehicle/${name}`, document.baseURI);
+        const response = await fetch(url);
+        if (!response.ok) throw new Error(`${name}: HTTP ${response.status}`);
+        const buffer = await this.ctx.decodeAudioData(await response.arrayBuffer());
+        if (!this.ctx || this.ctx.state === "closed") return;
+        this._startRecording(buffer);
+    }
+
+    _startRecording(buffer) {
+        this.engineSource = this.ctx.createBufferSource();
+        this.engineSource.buffer = buffer;
+        this.engineSource.loop = true;
+        this.engineGain = this.ctx.createGain();
+        this.engineGain.gain.value = 0.44;
+        this.engineSource.connect(this.engineGain).connect(this.engineBus);
+        this.engineSource.start();
+    }
+
+    /** Call from the E key gesture so Safari can resume audio immediately. */
     start() {
         this._ensure();
         if (!this.ctx) return;
-        if (this.ctx.state === "suspended") this.ctx.resume();
         this.started = true;
-        this.master.gain.setTargetAtTime(1, this.ctx.currentTime, 0.2);
+        this.ctx.resume().catch(() => {});
+        const t = this.ctx.currentTime;
+        this.lastUpdateTime = t;
+        this.master.gain.cancelScheduledValues(t);
+        this.master.gain.setTargetAtTime(1, t, 0.12);
     }
 
-    /** Fade the engine out — call on stepping out. */
     stop() {
         if (!this.ctx || !this.started) return;
         this.started = false;
-        this.master.gain.setTargetAtTime(0, this.ctx.currentTime, 0.25);
+        const t = this.ctx.currentTime;
+        this.master.gain.cancelScheduledValues(t);
+        this.master.gain.setTargetAtTime(0.0001, t, 0.18);
     }
 
     /**
-     * @param {number} speed01 0..1 fraction of top speed
-     * @param {number} throttle -1..1 damped pedal
-     * @param {boolean} grounded
+     * @param {number} speed01 fraction of authored top speed
+     * @param {number} throttle damped pedal, -1..1
+     * @param {boolean} grounded whether any tyre or chassis point has contact
      */
     update(speed01, throttle, grounded) {
         if (!this.ctx || !this.started) return;
         const t = this.ctx.currentTime;
+        const dt = Math.max(1 / 240, Math.min(0.1, t - this.lastUpdateTime));
+        this.lastUpdateTime = t;
+        const pedal = Math.min(1, Math.abs(throttle));
+        const gears = 4;
+        const gearPosition = Math.min(gears - 0.001, speed01 * gears);
+        const withinGear = gearPosition - Math.floor(gearPosition);
+        const speedRpm = speed01 < 0.035 ? 0.12 : 0.3 + withinGear * 0.62;
+        const rpmTarget = Math.min(1, speedRpm + pedal * (grounded ? 0.16 : 0.27));
+        const rpmRate = rpmTarget > this.rpm ? 8.5 : 5.2;
+        this.rpm += (rpmTarget - this.rpm) * (1 - Math.exp(-rpmRate * dt));
+        if (this.engineSource) {
+            this.engineSource.playbackRate.setTargetAtTime(0.7 + this.rpm * 0.7, t, 0.065);
+            this.engineGain.gain.setTargetAtTime(0.38 + pedal * 0.18, t, 0.07);
+        }
+        this.engineBus.gain.setTargetAtTime(0.62 + pedal * 0.24, t, 0.07);
+        this.engineTone.frequency.setTargetAtTime(1700 + this.rpm * 3900, t, 0.08);
 
-        // Fake 5-speed box: RPM sweeps within a gear then resets, so the pitch
-        // rises and drops on upshifts instead of climbing in one long ramp.
-        const gears = 5;
-        const gear = Math.min(gears - 1, Math.floor(speed01 * gears));
-        const within = speed01 * gears - gear;      // 0..1 through the gear
-        const rpm = 0.28 + 0.72 * within;           // idle floor to redline
-        const freq = 46 * (1 + rpm * 3.2);          // ~46 Hz idle upward
-        for (const o of this.oscs) o.frequency.setTargetAtTime(freq, t, 0.04);
-        this.sub.frequency.setTargetAtTime(freq * 0.5, t, 0.04);
-
-        const load = Math.max(0, throttle);
-        this.filter.frequency.setTargetAtTime(
-            500 + 2600 * (rpm * 0.6 + load * 0.4), t, 0.06
-        );
-        // Engine note eases off in the air (no load on the wheels).
-        const airborne = grounded ? 1 : 0.6;
-        this.master.gain.setTargetAtTime((0.10 + 0.14 * rpm) * airborne, t, 0.08);
-
-        // Tyre/wind rises with speed and drops when the wheels leave the snow.
-        this.noiseGain.gain.setTargetAtTime(
-            grounded ? 0.03 + 0.08 * speed01 : 0.01, t, 0.1
-        );
-        this.noiseFilter.frequency.setTargetAtTime(700 + 1800 * speed01, t, 0.1);
+        const roadLevel = grounded ? 0.008 + speed01 * 0.09 : speed01 * 0.012;
+        this.roadGain.gain.setTargetAtTime(roadLevel, t, 0.1);
+        this.roadFilter.frequency.setTargetAtTime(620 + speed01 * 1450, t, 0.1);
     }
 
     dispose() {
-        if (this.ctx) this.ctx.close();
+        try { this.engineSource?.stop(); } catch (_) { /* already stopped */ }
+        try { this.road?.stop(); } catch (_) { /* already stopped */ }
+        this.ctx?.close();
         this.ctx = null;
+        this.engineSource = null;
+        this.engineGain = null;
     }
 }

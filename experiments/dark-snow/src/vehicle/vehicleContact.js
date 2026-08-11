@@ -38,7 +38,7 @@ export class VehicleContact {
         this._prevX = v.position.x;
         this._prevZ = v.position.z;
 
-        if (!v.active || !v.grounded) return;
+        if (!v.active || !v.physics) return;
         const speed = Math.abs(v.speed);
         if (speed < 0.6) return;
 
@@ -46,52 +46,54 @@ export class VehicleContact {
         const fz = Math.cos(v.facing);
         const rx = Math.cos(v.facing);
         const rz = -Math.sin(v.facing);
-        // Sideways velocity component: how hard the car is drifting.
-        const lateral = v.velocity.x * rx + v.velocity.z * rz;
-        const slip = Math.min(1, Math.abs(lateral) / 5);
-
-        // Four tyre tracks. Scaled by distance travelled, not dt, so a patch of
-        // ground ends up at the same depth per metre at any speed or frame rate
-        // (identical reasoning to the walking scuff in SnowContact).
         const k = Math.min(moved, 0.4);
-        const contacts = [
-            [v.frontAxle, v.halfTrack], [v.frontAxle, -v.halfTrack],
-            [v.rearAxle, v.halfTrack], [v.rearAxle, -v.halfTrack],
-        ];
-        for (const [axle, track] of contacts) {
-            const cx = v.position.x + fx * axle + rx * track;
-            const cz = v.position.z + fz * axle + rz * track;
+        const wheels = v.physics.wheels;
+        for (let i = 0; i < 4; i++) {
+            const wheel = wheels[i];
+            if (!wheel.contact || wheel.normalLoad <= 0) continue;
+            const slip = Math.min(1, Math.hypot(
+                wheel.longitudinalSlip * 0.75,
+                wheel.slipAngle * 2.5
+            ));
             this.field.brush(
-                cx, cz,
+                wheel.contactPoint.x, wheel.contactPoint.z,
                 TRACK_WIDTH,
-                (0.05 + 0.06 * slip) * k,   // deeper when the tyre is scrubbing
-                0.04 * k,                    // a low berm at the rut edge
-                0.85 * k,                    // packed track
-                0,                           // no ice
-                v.facing,
+                (0.05 + 0.06 * slip) * k,
+                0.04 * k,
+                0.85 * k,
+                0,
+                v.facing + wheel.steerAngle,
                 TRACK_ELONG,
-                0.6                          // tyres tear the edge less than boots
+                0.6
             );
         }
 
-        this._kick(fx, fz, rx, rz, speed, slip);
+        this._kick(fx, fz, rx, rz, speed);
     }
 
     /**
      * Snow thrown off the driven (rear) wheels — up and back while accelerating,
      * and out to the side as a rooster tail when the car slides.
      */
-    _kick(fx, fz, rx, rz, speed, slip) {
+    _kick(fx, fz, rx, rz, speed) {
         const sp = this.spray;
         if (!sp) return;
         const v = this.vehicle;
         const speed01 = Math.min(1, speed / 16);
-        const n = 2 + ((speed01 * 8 + slip * 16) | 0);
+        const wheels = v.physics.wheels;
 
-        for (const side of [1, -1]) {
-            const cx = v.position.x + fx * v.rearAxle + rx * v.halfTrack * side;
-            const cz = v.position.z + fz * v.rearAxle + rz * v.halfTrack * side;
-            const cy = v.terrain ? v.terrain.heightAt(cx, cz) : v.position.y;
+        for (let i = 2; i < 4; i++) {
+            const wheel = wheels[i];
+            if (!wheel.contact || wheel.normalLoad <= 0) continue;
+            const side = wheel.side;
+            const slip = Math.min(1, Math.hypot(
+                wheel.longitudinalSlip * 0.75,
+                wheel.slipAngle * 2.5
+            ));
+            const n = 2 + ((speed01 * 8 + slip * 16) | 0);
+            const cx = wheel.contactPoint.x;
+            const cy = wheel.contactPoint.y;
+            const cz = wheel.contactPoint.z;
 
             for (let i = 0; i < n; i++) {
                 const up = 0.8 + Math.random() * 1.8 * (0.5 + speed01);

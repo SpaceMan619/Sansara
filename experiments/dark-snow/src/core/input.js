@@ -37,16 +37,24 @@ const LOOK_SCALE = 0.0022;
 let onToggleOverlay = null;
 /** @type {(() => void)|null} */
 let onToggleVehicle = null;
+/** @type {(() => void)|null} */
+let onOpenWorlds = null;
+/** @type {(() => void)|null} */
+let onRecoverVehicle = null;
 let mouseSurf = false;
 
 /**
  * @param {HTMLCanvasElement} canvas
  * @param {{ onToggleOverlay?: () => void,
- *           onToggleVehicle?: () => void }} [hooks]
+ *           onToggleVehicle?: () => void,
+ *           onOpenWorlds?: () => void,
+ *           onRecoverVehicle?: () => void }} [hooks]
  */
 export function initInput(canvas, hooks) {
     onToggleOverlay = hooks?.onToggleOverlay ?? null;
     onToggleVehicle = hooks?.onToggleVehicle ?? null;
+    onOpenWorlds = hooks?.onOpenWorlds ?? null;
+    onRecoverVehicle = hooks?.onRecoverVehicle ?? null;
 
     canvas.addEventListener("click", () => {
         if (!input.locked) canvas.requestPointerLock();
@@ -92,6 +100,11 @@ export function initInput(canvas, hooks) {
     );
 
     window.addEventListener("keydown", (e) => {
+        if (e.code === "Tab") {
+            e.preventDefault();
+            if (!e.repeat) onOpenWorlds?.();
+            return;
+        }
         // Overlay toggle works whether or not the pointer is locked.
         if (e.code === "F1" || e.code === "Backquote") {
             e.preventDefault();
@@ -103,6 +116,10 @@ export function initInput(canvas, hooks) {
         if (e.code === "KeyE" && !e.repeat) {
             e.preventDefault();
             onToggleVehicle?.();
+            return;
+        }
+        if (e.code === "KeyR" && !e.repeat) {
+            onRecoverVehicle?.();
             return;
         }
         if (e.code === "Space") e.preventDefault();

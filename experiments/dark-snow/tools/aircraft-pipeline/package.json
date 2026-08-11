@@ -1,0 +1,25 @@
+{
+  "name": "@sansara/aircraft-pipeline",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "help": "node ./pipeline.mjs help",
+    "dry-run": "node ./pipeline.mjs dry-run",
+    "ingest": "node ./pipeline.mjs ingest",
+    "validate": "node ./pipeline.mjs validate"
+  },
+  "dependencies": {
+    "@gltf-transform/cli": "4.4.2",
+    "@gltf-transform/core": "4.4.2",
+    "@gltf-transform/extensions": "4.4.2",
+    "@gltf-transform/functions": "4.4.2",
+    "sharp": "0.35.3"
+  },
+  "overrides": {
+    "sharp": "0.35.3"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

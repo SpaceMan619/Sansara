@@ -1,0 +1,9 @@
+# Keep license/provenance JSON reviewable, but never stage downloaded archives or generated models by accident.
+*/source/*.zip
+*/source/*.glb
+*/source/*.gltf
+*/source/*.bin
+*/source/textures/
+*/runtime/**/*.glb
+*/reports/
+.*.staging-*/
