@@ -41,6 +41,11 @@ import skyFrag from "./sky.fragment.wgsl?raw";
 
 import charVert from "./char.vertex.wgsl?raw";
 import charFrag from "./char.fragment.wgsl?raw";
+import riggedColorVert from "./riggedColor.vertex.wgsl?raw";
+import riggedColorFrag from "./riggedColor.fragment.wgsl?raw";
+import vehicleColorVert from "./vehicleColor.vertex.wgsl?raw";
+import vehicleColorFrag from "./vehicleColor.fragment.wgsl?raw";
+import vehicleDepthVert from "./vehicleDepth.vertex.wgsl?raw";
 import clothVert from "./cloth.vertex.wgsl?raw";
 import charDepthVert from "./charDepth.vertex.wgsl?raw";
 import clothDepthVert from "./clothDepth.vertex.wgsl?raw";
@@ -61,6 +66,7 @@ import crystalDepthVert from "./crystalDepth.vertex.wgsl?raw";
 import prepassFrag from "./prepass.fragment.wgsl?raw";
 import terrainPrepassVert from "./terrainPrepass.vertex.wgsl?raw";
 import charPrepassVert from "./charPrepass.vertex.wgsl?raw";
+import riggedPrepassVert from "./riggedPrepass.vertex.wgsl?raw";
 import clothPrepassVert from "./clothPrepass.vertex.wgsl?raw";
 import wakePrepassVert from "./wakePrepass.vertex.wgsl?raw";
 import wakePrepassFrag from "./wakePrepass.fragment.wgsl?raw";
@@ -102,6 +108,12 @@ const SHADERS = {
 
     charVertexShader: charVert,
     charPixelShader: charFrag,
+    riggedColorVertexShader: riggedColorVert,
+    riggedColorPixelShader: riggedColorFrag,
+    vehicleColorVertexShader: vehicleColorVert,
+    vehicleColorPixelShader: vehicleColorFrag,
+    // Rigid shadow caster for the SUV; reuses the terrainDepth fragment stage.
+    vehicleDepthVertexShader: vehicleDepthVert,
     clothVertexShader: clothVert,
     charDepthVertexShader: charDepthVert,
     clothDepthVertexShader: clothDepthVert,
@@ -125,6 +137,7 @@ const SHADERS = {
     prepassPixelShader: prepassFrag,
     terrainPrepassVertexShader: terrainPrepassVert,
     charPrepassVertexShader: charPrepassVert,
+    riggedPrepassVertexShader: riggedPrepassVert,
     clothPrepassVertexShader: clothPrepassVert,
     wakePrepassVertexShader: wakePrepassVert,
     wakePrepassPixelShader: wakePrepassFrag,

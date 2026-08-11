@@ -1,0 +1,1 @@
+import{t as e}from"./openpbrMaterialLoadingAdapter-CPk-HwnR.js";export{e as OpenPBRMaterialLoadingAdapter};

@@ -1,0 +1,2088 @@
+{
+  "schemaVersion": 1,
+  "id": "nlm-f22-raptor",
+  "metadata": {
+    "metadataStatus": "package-inspected",
+    "title": "F22 Raptor FREE",
+    "creator": "NLM",
+    "creatorUrl": "https://sketchfab.com/NLM-Group",
+    "sourceUrl": "https://sketchfab.com/3d-models/f22-raptor-free-2a64abf0866a405c865466c7642ca689",
+    "license": {
+      "name": "Creative Commons Attribution 4.0 International",
+      "spdx": "CC-BY-4.0",
+      "url": "https://creativecommons.org/licenses/by/4.0/"
+    },
+    "creditText": "\"F22 Raptor FREE\" by NLM, licensed under CC BY 4.0. Source: https://sketchfab.com/3d-models/f22-raptor-free-2a64abf0866a405c865466c7642ca689",
+    "notes": "Model-specific structure, animation, texture, and mesh metadata remain pending until the official Sketchfab package is supplied and inspected."
+  },
+  "source": {
+    "packageInspectionStatus": "inspected",
+    "sourceType": "glb",
+    "archivedAs": "original.glb",
+    "originalFilename": "f22_raptor_free.glb",
+    "selectedSceneEntry": null,
+    "bytes": 63774392,
+    "sha256": "7e2e7b06d4ef474cee47ad6d92f7f8bd0e6375ba0b265a5f95d08842a1050ed5",
+    "sourceUrl": "https://sketchfab.com/3d-models/f22-raptor-free-2a64abf0866a405c865466c7642ca689",
+    "creator": "NLM",
+    "license": {
+      "name": "Creative Commons Attribution 4.0 International",
+      "spdx": "CC-BY-4.0",
+      "url": "https://creativecommons.org/licenses/by/4.0/"
+    },
+    "creditText": "\"F22 Raptor FREE\" by NLM, licensed under CC BY 4.0. Source: https://sketchfab.com/3d-models/f22-raptor-free-2a64abf0866a405c865466c7642ca689",
+    "metadataStatus": "package-inspected",
+    "notes": "Model-specific structure, animation, texture, and mesh metadata remain pending until the official Sketchfab package is supplied and inspected."
+  },
+  "inspection": {
+    "counts": {
+      "scenes": 1,
+      "nodes": 176,
+      "meshes": 84,
+      "materials": 26,
+      "textures": 57,
+      "animations": 1,
+      "skins": 0,
+      "cameras": 0
+    },
+    "structureSha256": "87ddb029f5e3a6324409bae10f5c9efcfaf6f00e78c1abcf0c1e1b0eb42659bc",
+    "namedParts": [
+      "Sketchfab_model",
+      "root",
+      "GLTF_SceneRootNode",
+      "Empty.003_12",
+      "Cube.015_0",
+      "Object_5",
+      "Cube.018_1",
+      "Object_7",
+      "Cylinder.001_2",
+      "Object_9",
+      "Cylinder.002_3",
+      "Object_11",
+      "Cylinder.003_4",
+      "Object_13",
+      "Cylinder.004_5",
+      "Object_15",
+      "Cylinder.006_6",
+      "Object_17",
+      "Cylinder.007_7",
+      "Object_19",
+      "Cylinder.010_8",
+      "Object_21",
+      "Cylinder.011_9",
+      "Object_23",
+      "Object_24",
+      "Cylinder.012_10",
+      "Object_26",
+      "Cylinder.017_11",
+      "Object_28",
+      "Empty.004_16",
+      "Cube.019_13",
+      "Object_31",
+      "Cube.021_14",
+      "Object_33",
+      "Cylinder.008_15",
+      "Object_35",
+      "Empty.005_18",
+      "Cube.022_17",
+      "Object_38",
+      "Empty.006_21",
+      "Cube.002_19",
+      "Object_41",
+      "Cube.054_20",
+      "Object_43",
+      "Cylinder_22",
+      "Object_45",
+      "Cylinder.013_25",
+      "Object_47",
+      "Cylinder.005_23",
+      "Object_49",
+      "Cylinder.014_24",
+      "Object_51",
+      "Cylinder.015_26",
+      "Object_53",
+      "Cube.055_27",
+      "Object_55",
+      "Cube.056_28",
+      "Object_57",
+      "Cylinder.018_31",
+      "Object_59",
+      "Cylinder.009_29",
+      "Object_61",
+      "Cylinder.019_30",
+      "Object_63",
+      "Cube.059_32",
+      "Object_65",
+      "Cube.060_33",
+      "Object_67",
+      "Empty.007_35",
+      "Cube.072_34",
+      "Object_70",
+      "Empty.008_37",
+      "Cube.071_36",
+      "Object_73",
+      "Empty.009_39",
+      "Cube.073_38",
+      "Object_76",
+      "Empty.010_41",
+      "Cube.074_40",
+      "Object_79",
+      "Empty.011_43",
+      "Cube.007_42",
+      "Object_82",
+      "Empty.012_45",
+      "Cube.008_44",
+      "Object_85",
+      "Cylinder.016_46",
+      "Object_87",
+      "Circle_47",
+      "Object_89",
+      "Cube.006_51",
+      "Object_91",
+      "Cube.010_52",
+      "Object_93",
+      "Cube.014_53",
+      "Object_95",
+      "Cube.017_54",
+      "Object_97",
+      "Cube.020_55",
+      "Object_99",
+      "Cube.026_56",
+      "Object_101",
+      "Cube.027_57",
+      "Object_103",
+      "Cube.037_58",
+      "Object_105",
+      "Cube.003_59",
+      "Object_107",
+      "Cube.004_60",
+      "Object_109",
+      "Cube.012_61",
+      "Object_111",
+      "Plane_62",
+      "Object_113",
+      "Cube.013_63",
+      "Object_115",
+      "Cube.005_64",
+      "Object_117",
+      "Cube.042_65",
+      "Object_119",
+      "Cube.043_66",
+      "Object_121",
+      "Cube.045_67",
+      "Object_123",
+      "Cube.016_68",
+      "Object_125",
+      "Cube.050_69",
+      "Object_127",
+      "Cube.051_70",
+      "Object_129",
+      "Cube.052_71",
+      "Object_131",
+      "Cube.053_72",
+      "Object_133",
+      "Cube.066_73",
+      "Object_135",
+      "Cube.065_74",
+      "Object_137",
+      "Cube.068_76",
+      "Object_139",
+      "Cube.067_75",
+      "Object_141",
+      "Object_142",
+      "Object_143",
+      "Cube.069_78",
+      "Object_145",
+      "Cube.070_77",
+      "Object_147",
+      "Object_148",
+      "Object_149",
+      "Cube.044_79",
+      "Object_151",
+      "Cube.023_80",
+      "Object_153",
+      "Cube.064_83",
+      "Object_155",
+      "Cube.001_84",
+      "Object_157",
+      "Cube.009_85",
+      "Object_159",
+      "Cube.011_86",
+      "Object_161",
+      "Cube.028_87",
+      "Object_163",
+      "Cube.058_88",
+      "Object_165",
+      "Cube.061_89",
+      "Object_167",
+      "Cube.062_90",
+      "Object_169",
+      "Cube.048_91",
+      "Object_171",
+      "Cube.049_92",
+      "Object_173",
+      "Cube.047_93",
+      "Object_175"
+    ],
+    "animations": [
+      {
+        "name": "Animation",
+        "channels": [
+          {
+            "targetNode": "Cube.055_27",
+            "targetPath": "translation"
+          },
+          {
+            "targetNode": "Cube.055_27",
+            "targetPath": "rotation"
+          },
+          {
+            "targetNode": "Cube.055_27",
+            "targetPath": "scale"
+          },
+          {
+            "targetNode": "Cube.059_32",
+            "targetPath": "translation"
+          },
+          {
+            "targetNode": "Cube.059_32",
+            "targetPath": "rotation"
+          },
+          {
+            "targetNode": "Cube.059_32",
+            "targetPath": "scale"
+          },
+          {
+            "targetNode": "Empty.003_12",
+            "targetPath": "rotation"
+          },
+          {
+            "targetNode": "Empty.004_16",
+            "targetPath": "translation"
+          },
+          {
+            "targetNode": "Empty.004_16",
+            "targetPath": "rotation"
+          },
+          {
+            "targetNode": "Empty.005_18",
+            "targetPath": "translation"
+          },
+          {
+            "targetNode": "Empty.005_18",
+            "targetPath": "rotation"
+          },
+          {
+            "targetNode": "Cylinder.013_25",
+            "targetPath": "rotation"
+          },
+          {
+            "targetNode": "Cylinder.013_25",
+            "targetPath": "scale"
+          },
+          {
+            "targetNode": "Cube.056_28",
+            "targetPath": "rotation"
+          },
+          {
+            "targetNode": "Cylinder.018_31",
+            "targetPath": "rotation"
+          },
+          {
+            "targetNode": "Cube.060_33",
+            "targetPath": "rotation"
+          },
+          {
+            "targetNode": "Empty.007_35",
+            "targetPath": "rotation"
+          },
+          {
+            "targetNode": "Empty.007_35",
+            "targetPath": "scale"
+          },
+          {
+            "targetNode": "Empty.008_37",
+            "targetPath": "rotation"
+          },
+          {
+            "targetNode": "Empty.009_39",
+            "targetPath": "rotation"
+          },
+          {
+            "targetNode": "Empty.010_41",
+            "targetPath": "rotation"
+          },
+          {
+            "targetNode": "Empty.011_43",
+            "targetPath": "rotation"
+          },
+          {
+            "targetNode": "Empty.012_45",
+            "targetPath": "rotation"
+          },
+          {
+            "targetNode": "Circle_47",
+            "targetPath": "translation"
+          },
+          {
+            "targetNode": "Cube.043_66",
+            "targetPath": "rotation"
+          },
+          {
+            "targetNode": "Cube.016_68",
+            "targetPath": "rotation"
+          },
+          {
+            "targetNode": "Cube.050_69",
+            "targetPath": "rotation"
+          },
+          {
+            "targetNode": "Cube.051_70",
+            "targetPath": "rotation"
+          },
+          {
+            "targetNode": "Cube.052_71",
+            "targetPath": "rotation"
+          },
+          {
+            "targetNode": "Cube.068_76",
+            "targetPath": "translation"
+          },
+          {
+            "targetNode": "Cube.068_76",
+            "targetPath": "rotation"
+          },
+          {
+            "targetNode": "Cube.069_78",
+            "targetPath": "translation"
+          },
+          {
+            "targetNode": "Cube.069_78",
+            "targetPath": "rotation"
+          },
+          {
+            "targetNode": "Cube.044_79",
+            "targetPath": "rotation"
+          },
+          {
+            "targetNode": "Cube.064_83",
+            "targetPath": "rotation"
+          },
+          {
+            "targetNode": "Cube.058_88",
+            "targetPath": "rotation"
+          },
+          {
+            "targetNode": "Cube.061_89",
+            "targetPath": "rotation"
+          },
+          {
+            "targetNode": "Cube.062_90",
+            "targetPath": "rotation"
+          },
+          {
+            "targetNode": "Cube.048_91",
+            "targetPath": "rotation"
+          },
+          {
+            "targetNode": "Cube.049_92",
+            "targetPath": "rotation"
+          },
+          {
+            "targetNode": "Cube.049_92",
+            "targetPath": "scale"
+          }
+        ]
+      }
+    ],
+    "textures": [
+      {
+        "id": "texture-000",
+        "mimeType": "image/png",
+        "dimensions": [
+          2048,
+          2048
+        ]
+      },
+      {
+        "id": "texture-001",
+        "mimeType": "image/png",
+        "dimensions": [
+          2048,
+          2048
+        ]
+      },
+      {
+        "id": "texture-002",
+        "mimeType": "image/png",
+        "dimensions": [
+          2048,
+          2048
+        ]
+      },
+      {
+        "id": "texture-003",
+        "mimeType": "image/png",
+        "dimensions": [
+          2048,
+          2048
+        ]
+      },
+      {
+        "id": "texture-004",
+        "mimeType": "image/png",
+        "dimensions": [
+          2048,
+          2048
+        ]
+      },
+      {
+        "id": "texture-005",
+        "mimeType": "image/png",
+        "dimensions": [
+          2048,
+          2048
+        ]
+      },
+      {
+        "id": "texture-006",
+        "mimeType": "image/png",
+        "dimensions": [
+          2048,
+          2048
+        ]
+      },
+      {
+        "id": "texture-007",
+        "mimeType": "image/png",
+        "dimensions": [
+          2048,
+          2048
+        ]
+      },
+      {
+        "id": "texture-008",
+        "mimeType": "image/png",
+        "dimensions": [
+          2048,
+          2048
+        ]
+      },
+      {
+        "id": "texture-009",
+        "mimeType": "image/png",
+        "dimensions": [
+          2048,
+          2048
+        ]
+      },
+      {
+        "id": "texture-010",
+        "mimeType": "image/png",
+        "dimensions": [
+          2048,
+          2048
+        ]
+      },
+      {
+        "id": "texture-011",
+        "mimeType": "image/png",
+        "dimensions": [
+          2048,
+          2048
+        ]
+      },
+      {
+        "id": "texture-012",
+        "mimeType": "image/png",
+        "dimensions": [
+          2048,
+          2048
+        ]
+      },
+      {
+        "id": "texture-013",
+        "mimeType": "image/png",
+        "dimensions": [
+          2048,
+          2048
+        ]
+      },
+      {
+        "id": "texture-014",
+        "mimeType": "image/png",
+        "dimensions": [
+          2048,
+          2048
+        ]
+      },
+      {
+        "id": "texture-015",
+        "mimeType": "image/png",
+        "dimensions": [
+          2048,
+          2048
+        ]
+      },
+      {
+        "id": "texture-016",
+        "mimeType": "image/png",
+        "dimensions": [
+          2048,
+          2048
+        ]
+      },
+      {
+        "id": "texture-017",
+        "mimeType": "image/png",
+        "dimensions": [
+          2048,
+          2048
+        ]
+      },
+      {
+        "id": "texture-018",
+        "mimeType": "image/png",
+        "dimensions": [
+          2048,
+          2048
+        ]
+      },
+      {
+        "id": "texture-019",
+        "mimeType": "image/png",
+        "dimensions": [
+          2048,
+          2048
+        ]
+      },
+      {
+        "id": "texture-020",
+        "mimeType": "image/png",
+        "dimensions": [
+          2048,
+          2048
+        ]
+      },
+      {
+        "id": "texture-021",
+        "mimeType": "image/png",
+        "dimensions": [
+          2048,
+          2048
+        ]
+      },
+      {
+        "id": "texture-022",
+        "mimeType": "image/png",
+        "dimensions": [
+          2048,
+          2048
+        ]
+      },
+      {
+        "id": "texture-023",
+        "mimeType": "image/png",
+        "dimensions": [
+          2048,
+          2048
+        ]
+      },
+      {
+        "id": "texture-024",
+        "mimeType": "image/png",
+        "dimensions": [
+          2048,
+          2048
+        ]
+      },
+      {
+        "id": "texture-025",
+        "mimeType": "image/png",
+        "dimensions": [
+          2048,
+          2048
+        ]
+      },
+      {
+        "id": "texture-026",
+        "mimeType": "image/png",
+        "dimensions": [
+          2048,
+          2048
+        ]
+      },
+      {
+        "id": "texture-027",
+        "mimeType": "image/png",
+        "dimensions": [
+          2048,
+          2048
+        ]
+      },
+      {
+        "id": "texture-028",
+        "mimeType": "image/png",
+        "dimensions": [
+          2048,
+          2048
+        ]
+      },
+      {
+        "id": "texture-029",
+        "mimeType": "image/png",
+        "dimensions": [
+          2048,
+          2048
+        ]
+      },
+      {
+        "id": "texture-030",
+        "mimeType": "image/png",
+        "dimensions": [
+          2048,
+          2048
+        ]
+      },
+      {
+        "id": "texture-031",
+        "mimeType": "image/png",
+        "dimensions": [
+          2048,
+          2048
+        ]
+      },
+      {
+        "id": "texture-032",
+        "mimeType": "image/png",
+        "dimensions": [
+          2048,
+          2048
+        ]
+      },
+      {
+        "id": "texture-033",
+        "mimeType": "image/png",
+        "dimensions": [
+          2048,
+          2048
+        ]
+      },
+      {
+        "id": "texture-034",
+        "mimeType": "image/png",
+        "dimensions": [
+          2048,
+          2048
+        ]
+      },
+      {
+        "id": "texture-035",
+        "mimeType": "image/jpeg",
+        "dimensions": [
+          256,
+          256
+        ]
+      },
+      {
+        "id": "texture-036",
+        "mimeType": "image/png",
+        "dimensions": [
+          2048,
+          2048
+        ]
+      },
+      {
+        "id": "texture-037",
+        "mimeType": "image/png",
+        "dimensions": [
+          2048,
+          2048
+        ]
+      },
+      {
+        "id": "texture-038",
+        "mimeType": "image/png",
+        "dimensions": [
+          2048,
+          2048
+        ]
+      },
+      {
+        "id": "texture-039",
+        "mimeType": "image/png",
+        "dimensions": [
+          2048,
+          2048
+        ]
+      },
+      {
+        "id": "texture-040",
+        "mimeType": "image/png",
+        "dimensions": [
+          2048,
+          2048
+        ]
+      },
+      {
+        "id": "texture-041",
+        "mimeType": "image/png",
+        "dimensions": [
+          2048,
+          2048
+        ]
+      },
+      {
+        "id": "texture-042",
+        "mimeType": "image/png",
+        "dimensions": [
+          2048,
+          2048
+        ]
+      },
+      {
+        "id": "texture-043",
+        "mimeType": "image/png",
+        "dimensions": [
+          2048,
+          2048
+        ]
+      },
+      {
+        "id": "texture-044",
+        "mimeType": "image/png",
+        "dimensions": [
+          2048,
+          2048
+        ]
+      },
+      {
+        "id": "texture-045",
+        "mimeType": "image/png",
+        "dimensions": [
+          2048,
+          2048
+        ]
+      },
+      {
+        "id": "texture-046",
+        "mimeType": "image/png",
+        "dimensions": [
+          2048,
+          2048
+        ]
+      },
+      {
+        "id": "texture-047",
+        "mimeType": "image/png",
+        "dimensions": [
+          2048,
+          2048
+        ]
+      },
+      {
+        "id": "texture-048",
+        "mimeType": "image/png",
+        "dimensions": [
+          2048,
+          2048
+        ]
+      },
+      {
+        "id": "texture-049",
+        "mimeType": "image/png",
+        "dimensions": [
+          2048,
+          2048
+        ]
+      },
+      {
+        "id": "texture-050",
+        "mimeType": "image/png",
+        "dimensions": [
+          2048,
+          2048
+        ]
+      },
+      {
+        "id": "texture-051",
+        "mimeType": "image/png",
+        "dimensions": [
+          2048,
+          2048
+        ]
+      },
+      {
+        "id": "texture-052",
+        "mimeType": "image/png",
+        "dimensions": [
+          2048,
+          2048
+        ]
+      },
+      {
+        "id": "texture-053",
+        "mimeType": "image/png",
+        "dimensions": [
+          2048,
+          2048
+        ]
+      },
+      {
+        "id": "texture-054",
+        "mimeType": "image/png",
+        "dimensions": [
+          2048,
+          2048
+        ]
+      },
+      {
+        "id": "texture-055",
+        "mimeType": "image/png",
+        "dimensions": [
+          2048,
+          2048
+        ]
+      },
+      {
+        "id": "texture-056",
+        "mimeType": "image/png",
+        "dimensions": [
+          2048,
+          2048
+        ]
+      }
+    ],
+    "extensionsUsed": [
+      "KHR_materials_specular",
+      "KHR_materials_transmission"
+    ],
+    "extensionsRequired": []
+  },
+  "runtime": {
+    "high": {
+      "url": "/vehicles/aircraft/nlm-f22-raptor/runtime/high/model.glb",
+      "textureMaxSize": 2048,
+      "bytes": 71977400,
+      "sha256": "7c97e071f4c9e33feadaf9a4885ce1618f588b39e05956e80a3dc3504f87b4c0",
+      "structureSha256": "87ddb029f5e3a6324409bae10f5c9efcfaf6f00e78c1abcf0c1e1b0eb42659bc",
+      "textureDimensions": [
+        {
+          "id": "texture-000",
+          "dimensions": [
+            2048,
+            2048
+          ]
+        },
+        {
+          "id": "texture-001",
+          "dimensions": [
+            2048,
+            2048
+          ]
+        },
+        {
+          "id": "texture-002",
+          "dimensions": [
+            2048,
+            2048
+          ]
+        },
+        {
+          "id": "texture-003",
+          "dimensions": [
+            2048,
+            2048
+          ]
+        },
+        {
+          "id": "texture-004",
+          "dimensions": [
+            2048,
+            2048
+          ]
+        },
+        {
+          "id": "texture-005",
+          "dimensions": [
+            2048,
+            2048
+          ]
+        },
+        {
+          "id": "texture-006",
+          "dimensions": [
+            2048,
+            2048
+          ]
+        },
+        {
+          "id": "texture-007",
+          "dimensions": [
+            2048,
+            2048
+          ]
+        },
+        {
+          "id": "texture-008",
+          "dimensions": [
+            2048,
+            2048
+          ]
+        },
+        {
+          "id": "texture-009",
+          "dimensions": [
+            2048,
+            2048
+          ]
+        },
+        {
+          "id": "texture-010",
+          "dimensions": [
+            2048,
+            2048
+          ]
+        },
+        {
+          "id": "texture-011",
+          "dimensions": [
+            2048,
+            2048
+          ]
+        },
+        {
+          "id": "texture-012",
+          "dimensions": [
+            2048,
+            2048
+          ]
+        },
+        {
+          "id": "texture-013",
+          "dimensions": [
+            2048,
+            2048
+          ]
+        },
+        {
+          "id": "texture-014",
+          "dimensions": [
+            2048,
+            2048
+          ]
+        },
+        {
+          "id": "texture-015",
+          "dimensions": [
+            2048,
+            2048
+          ]
+        },
+        {
+          "id": "texture-016",
+          "dimensions": [
+            2048,
+            2048
+          ]
+        },
+        {
+          "id": "texture-017",
+          "dimensions": [
+            2048,
+            2048
+          ]
+        },
+        {
+          "id": "texture-018",
+          "dimensions": [
+            2048,
+            2048
+          ]
+        },
+        {
+          "id": "texture-019",
+          "dimensions": [
+            2048,
+            2048
+          ]
+        },
+        {
+          "id": "texture-020",
+          "dimensions": [
+            2048,
+            2048
+          ]
+        },
+        {
+          "id": "texture-021",
+          "dimensions": [
+            2048,
+            2048
+          ]
+        },
+        {
+          "id": "texture-022",
+          "dimensions": [
+            2048,
+            2048
+          ]
+        },
+        {
+          "id": "texture-023",
+          "dimensions": [
+            2048,
+            2048
+          ]
+        },
+        {
+          "id": "texture-024",
+          "dimensions": [
+            2048,
+            2048
+          ]
+        },
+        {
+          "id": "texture-025",
+          "dimensions": [
+            2048,
+            2048
+          ]
+        },
+        {
+          "id": "texture-026",
+          "dimensions": [
+            2048,
+            2048
+          ]
+        },
+        {
+          "id": "texture-027",
+          "dimensions": [
+            2048,
+            2048
+          ]
+        },
+        {
+          "id": "texture-028",
+          "dimensions": [
+            2048,
+            2048
+          ]
+        },
+        {
+          "id": "texture-029",
+          "dimensions": [
+            2048,
+            2048
+          ]
+        },
+        {
+          "id": "texture-030",
+          "dimensions": [
+            2048,
+            2048
+          ]
+        },
+        {
+          "id": "texture-031",
+          "dimensions": [
+            2048,
+            2048
+          ]
+        },
+        {
+          "id": "texture-032",
+          "dimensions": [
+            2048,
+            2048
+          ]
+        },
+        {
+          "id": "texture-033",
+          "dimensions": [
+            2048,
+            2048
+          ]
+        },
+        {
+          "id": "texture-034",
+          "dimensions": [
+            2048,
+            2048
+          ]
+        },
+        {
+          "id": "texture-035",
+          "dimensions": [
+            256,
+            256
+          ]
+        },
+        {
+          "id": "texture-036",
+          "dimensions": [
+            2048,
+            2048
+          ]
+        },
+        {
+          "id": "texture-037",
+          "dimensions": [
+            2048,
+            2048
+          ]
+        },
+        {
+          "id": "texture-038",
+          "dimensions": [
+            2048,
+            2048
+          ]
+        },
+        {
+          "id": "texture-039",
+          "dimensions": [
+            2048,
+            2048
+          ]
+        },
+        {
+          "id": "texture-040",
+          "dimensions": [
+            2048,
+            2048
+          ]
+        },
+        {
+          "id": "texture-041",
+          "dimensions": [
+            2048,
+            2048
+          ]
+        },
+        {
+          "id": "texture-042",
+          "dimensions": [
+            2048,
+            2048
+          ]
+        },
+        {
+          "id": "texture-043",
+          "dimensions": [
+            2048,
+            2048
+          ]
+        },
+        {
+          "id": "texture-044",
+          "dimensions": [
+            2048,
+            2048
+          ]
+        },
+        {
+          "id": "texture-045",
+          "dimensions": [
+            2048,
+            2048
+          ]
+        },
+        {
+          "id": "texture-046",
+          "dimensions": [
+            2048,
+            2048
+          ]
+        },
+        {
+          "id": "texture-047",
+          "dimensions": [
+            2048,
+            2048
+          ]
+        },
+        {
+          "id": "texture-048",
+          "dimensions": [
+            2048,
+            2048
+          ]
+        },
+        {
+          "id": "texture-049",
+          "dimensions": [
+            2048,
+            2048
+          ]
+        },
+        {
+          "id": "texture-050",
+          "dimensions": [
+            2048,
+            2048
+          ]
+        },
+        {
+          "id": "texture-051",
+          "dimensions": [
+            2048,
+            2048
+          ]
+        },
+        {
+          "id": "texture-052",
+          "dimensions": [
+            2048,
+            2048
+          ]
+        },
+        {
+          "id": "texture-053",
+          "dimensions": [
+            2048,
+            2048
+          ]
+        },
+        {
+          "id": "texture-054",
+          "dimensions": [
+            2048,
+            2048
+          ]
+        },
+        {
+          "id": "texture-055",
+          "dimensions": [
+            2048,
+            2048
+          ]
+        },
+        {
+          "id": "texture-056",
+          "dimensions": [
+            2048,
+            2048
+          ]
+        }
+      ]
+    },
+    "balanced": {
+      "url": "/vehicles/aircraft/nlm-f22-raptor/runtime/balanced/model.glb",
+      "textureMaxSize": 1024,
+      "bytes": 28435868,
+      "sha256": "3ae694778c80ebebeff19e8565d15d755ce5f0818d54dc4f88be045bca82fc3f",
+      "structureSha256": "87ddb029f5e3a6324409bae10f5c9efcfaf6f00e78c1abcf0c1e1b0eb42659bc",
+      "textureDimensions": [
+        {
+          "id": "texture-000",
+          "dimensions": [
+            1024,
+            1024
+          ]
+        },
+        {
+          "id": "texture-001",
+          "dimensions": [
+            1024,
+            1024
+          ]
+        },
+        {
+          "id": "texture-002",
+          "dimensions": [
+            1024,
+            1024
+          ]
+        },
+        {
+          "id": "texture-003",
+          "dimensions": [
+            1024,
+            1024
+          ]
+        },
+        {
+          "id": "texture-004",
+          "dimensions": [
+            1024,
+            1024
+          ]
+        },
+        {
+          "id": "texture-005",
+          "dimensions": [
+            1024,
+            1024
+          ]
+        },
+        {
+          "id": "texture-006",
+          "dimensions": [
+            1024,
+            1024
+          ]
+        },
+        {
+          "id": "texture-007",
+          "dimensions": [
+            1024,
+            1024
+          ]
+        },
+        {
+          "id": "texture-008",
+          "dimensions": [
+            1024,
+            1024
+          ]
+        },
+        {
+          "id": "texture-009",
+          "dimensions": [
+            1024,
+            1024
+          ]
+        },
+        {
+          "id": "texture-010",
+          "dimensions": [
+            1024,
+            1024
+          ]
+        },
+        {
+          "id": "texture-011",
+          "dimensions": [
+            1024,
+            1024
+          ]
+        },
+        {
+          "id": "texture-012",
+          "dimensions": [
+            1024,
+            1024
+          ]
+        },
+        {
+          "id": "texture-013",
+          "dimensions": [
+            1024,
+            1024
+          ]
+        },
+        {
+          "id": "texture-014",
+          "dimensions": [
+            1024,
+            1024
+          ]
+        },
+        {
+          "id": "texture-015",
+          "dimensions": [
+            1024,
+            1024
+          ]
+        },
+        {
+          "id": "texture-016",
+          "dimensions": [
+            1024,
+            1024
+          ]
+        },
+        {
+          "id": "texture-017",
+          "dimensions": [
+            1024,
+            1024
+          ]
+        },
+        {
+          "id": "texture-018",
+          "dimensions": [
+            1024,
+            1024
+          ]
+        },
+        {
+          "id": "texture-019",
+          "dimensions": [
+            1024,
+            1024
+          ]
+        },
+        {
+          "id": "texture-020",
+          "dimensions": [
+            1024,
+            1024
+          ]
+        },
+        {
+          "id": "texture-021",
+          "dimensions": [
+            1024,
+            1024
+          ]
+        },
+        {
+          "id": "texture-022",
+          "dimensions": [
+            1024,
+            1024
+          ]
+        },
+        {
+          "id": "texture-023",
+          "dimensions": [
+            1024,
+            1024
+          ]
+        },
+        {
+          "id": "texture-024",
+          "dimensions": [
+            1024,
+            1024
+          ]
+        },
+        {
+          "id": "texture-025",
+          "dimensions": [
+            1024,
+            1024
+          ]
+        },
+        {
+          "id": "texture-026",
+          "dimensions": [
+            1024,
+            1024
+          ]
+        },
+        {
+          "id": "texture-027",
+          "dimensions": [
+            1024,
+            1024
+          ]
+        },
+        {
+          "id": "texture-028",
+          "dimensions": [
+            1024,
+            1024
+          ]
+        },
+        {
+          "id": "texture-029",
+          "dimensions": [
+            1024,
+            1024
+          ]
+        },
+        {
+          "id": "texture-030",
+          "dimensions": [
+            1024,
+            1024
+          ]
+        },
+        {
+          "id": "texture-031",
+          "dimensions": [
+            1024,
+            1024
+          ]
+        },
+        {
+          "id": "texture-032",
+          "dimensions": [
+            1024,
+            1024
+          ]
+        },
+        {
+          "id": "texture-033",
+          "dimensions": [
+            1024,
+            1024
+          ]
+        },
+        {
+          "id": "texture-034",
+          "dimensions": [
+            1024,
+            1024
+          ]
+        },
+        {
+          "id": "texture-035",
+          "dimensions": [
+            256,
+            256
+          ]
+        },
+        {
+          "id": "texture-036",
+          "dimensions": [
+            1024,
+            1024
+          ]
+        },
+        {
+          "id": "texture-037",
+          "dimensions": [
+            1024,
+            1024
+          ]
+        },
+        {
+          "id": "texture-038",
+          "dimensions": [
+            1024,
+            1024
+          ]
+        },
+        {
+          "id": "texture-039",
+          "dimensions": [
+            1024,
+            1024
+          ]
+        },
+        {
+          "id": "texture-040",
+          "dimensions": [
+            1024,
+            1024
+          ]
+        },
+        {
+          "id": "texture-041",
+          "dimensions": [
+            1024,
+            1024
+          ]
+        },
+        {
+          "id": "texture-042",
+          "dimensions": [
+            1024,
+            1024
+          ]
+        },
+        {
+          "id": "texture-043",
+          "dimensions": [
+            1024,
+            1024
+          ]
+        },
+        {
+          "id": "texture-044",
+          "dimensions": [
+            1024,
+            1024
+          ]
+        },
+        {
+          "id": "texture-045",
+          "dimensions": [
+            1024,
+            1024
+          ]
+        },
+        {
+          "id": "texture-046",
+          "dimensions": [
+            1024,
+            1024
+          ]
+        },
+        {
+          "id": "texture-047",
+          "dimensions": [
+            1024,
+            1024
+          ]
+        },
+        {
+          "id": "texture-048",
+          "dimensions": [
+            1024,
+            1024
+          ]
+        },
+        {
+          "id": "texture-049",
+          "dimensions": [
+            1024,
+            1024
+          ]
+        },
+        {
+          "id": "texture-050",
+          "dimensions": [
+            1024,
+            1024
+          ]
+        },
+        {
+          "id": "texture-051",
+          "dimensions": [
+            1024,
+            1024
+          ]
+        },
+        {
+          "id": "texture-052",
+          "dimensions": [
+            1024,
+            1024
+          ]
+        },
+        {
+          "id": "texture-053",
+          "dimensions": [
+            1024,
+            1024
+          ]
+        },
+        {
+          "id": "texture-054",
+          "dimensions": [
+            1024,
+            1024
+          ]
+        },
+        {
+          "id": "texture-055",
+          "dimensions": [
+            1024,
+            1024
+          ]
+        },
+        {
+          "id": "texture-056",
+          "dimensions": [
+            1024,
+            1024
+          ]
+        }
+      ]
+    },
+    "low": {
+      "url": "/vehicles/aircraft/nlm-f22-raptor/runtime/low/model.glb",
+      "textureMaxSize": 512,
+      "bytes": 11921688,
+      "sha256": "40a0cf62e1210e8a74f9e957a09a0809414fb77c97c53a7e482e200b9dd32ace",
+      "structureSha256": "87ddb029f5e3a6324409bae10f5c9efcfaf6f00e78c1abcf0c1e1b0eb42659bc",
+      "textureDimensions": [
+        {
+          "id": "texture-000",
+          "dimensions": [
+            512,
+            512
+          ]
+        },
+        {
+          "id": "texture-001",
+          "dimensions": [
+            512,
+            512
+          ]
+        },
+        {
+          "id": "texture-002",
+          "dimensions": [
+            512,
+            512
+          ]
+        },
+        {
+          "id": "texture-003",
+          "dimensions": [
+            512,
+            512
+          ]
+        },
+        {
+          "id": "texture-004",
+          "dimensions": [
+            512,
+            512
+          ]
+        },
+        {
+          "id": "texture-005",
+          "dimensions": [
+            512,
+            512
+          ]
+        },
+        {
+          "id": "texture-006",
+          "dimensions": [
+            512,
+            512
+          ]
+        },
+        {
+          "id": "texture-007",
+          "dimensions": [
+            512,
+            512
+          ]
+        },
+        {
+          "id": "texture-008",
+          "dimensions": [
+            512,
+            512
+          ]
+        },
+        {
+          "id": "texture-009",
+          "dimensions": [
+            512,
+            512
+          ]
+        },
+        {
+          "id": "texture-010",
+          "dimensions": [
+            512,
+            512
+          ]
+        },
+        {
+          "id": "texture-011",
+          "dimensions": [
+            512,
+            512
+          ]
+        },
+        {
+          "id": "texture-012",
+          "dimensions": [
+            512,
+            512
+          ]
+        },
+        {
+          "id": "texture-013",
+          "dimensions": [
+            512,
+            512
+          ]
+        },
+        {
+          "id": "texture-014",
+          "dimensions": [
+            512,
+            512
+          ]
+        },
+        {
+          "id": "texture-015",
+          "dimensions": [
+            512,
+            512
+          ]
+        },
+        {
+          "id": "texture-016",
+          "dimensions": [
+            512,
+            512
+          ]
+        },
+        {
+          "id": "texture-017",
+          "dimensions": [
+            512,
+            512
+          ]
+        },
+        {
+          "id": "texture-018",
+          "dimensions": [
+            512,
+            512
+          ]
+        },
+        {
+          "id": "texture-019",
+          "dimensions": [
+            512,
+            512
+          ]
+        },
+        {
+          "id": "texture-020",
+          "dimensions": [
+            512,
+            512
+          ]
+        },
+        {
+          "id": "texture-021",
+          "dimensions": [
+            512,
+            512
+          ]
+        },
+        {
+          "id": "texture-022",
+          "dimensions": [
+            512,
+            512
+          ]
+        },
+        {
+          "id": "texture-023",
+          "dimensions": [
+            512,
+            512
+          ]
+        },
+        {
+          "id": "texture-024",
+          "dimensions": [
+            512,
+            512
+          ]
+        },
+        {
+          "id": "texture-025",
+          "dimensions": [
+            512,
+            512
+          ]
+        },
+        {
+          "id": "texture-026",
+          "dimensions": [
+            512,
+            512
+          ]
+        },
+        {
+          "id": "texture-027",
+          "dimensions": [
+            512,
+            512
+          ]
+        },
+        {
+          "id": "texture-028",
+          "dimensions": [
+            512,
+            512
+          ]
+        },
+        {
+          "id": "texture-029",
+          "dimensions": [
+            512,
+            512
+          ]
+        },
+        {
+          "id": "texture-030",
+          "dimensions": [
+            512,
+            512
+          ]
+        },
+        {
+          "id": "texture-031",
+          "dimensions": [
+            512,
+            512
+          ]
+        },
+        {
+          "id": "texture-032",
+          "dimensions": [
+            512,
+            512
+          ]
+        },
+        {
+          "id": "texture-033",
+          "dimensions": [
+            512,
+            512
+          ]
+        },
+        {
+          "id": "texture-034",
+          "dimensions": [
+            512,
+            512
+          ]
+        },
+        {
+          "id": "texture-035",
+          "dimensions": [
+            256,
+            256
+          ]
+        },
+        {
+          "id": "texture-036",
+          "dimensions": [
+            512,
+            512
+          ]
+        },
+        {
+          "id": "texture-037",
+          "dimensions": [
+            512,
+            512
+          ]
+        },
+        {
+          "id": "texture-038",
+          "dimensions": [
+            512,
+            512
+          ]
+        },
+        {
+          "id": "texture-039",
+          "dimensions": [
+            512,
+            512
+          ]
+        },
+        {
+          "id": "texture-040",
+          "dimensions": [
+            512,
+            512
+          ]
+        },
+        {
+          "id": "texture-041",
+          "dimensions": [
+            512,
+            512
+          ]
+        },
+        {
+          "id": "texture-042",
+          "dimensions": [
+            512,
+            512
+          ]
+        },
+        {
+          "id": "texture-043",
+          "dimensions": [
+            512,
+            512
+          ]
+        },
+        {
+          "id": "texture-044",
+          "dimensions": [
+            512,
+            512
+          ]
+        },
+        {
+          "id": "texture-045",
+          "dimensions": [
+            512,
+            512
+          ]
+        },
+        {
+          "id": "texture-046",
+          "dimensions": [
+            512,
+            512
+          ]
+        },
+        {
+          "id": "texture-047",
+          "dimensions": [
+            512,
+            512
+          ]
+        },
+        {
+          "id": "texture-048",
+          "dimensions": [
+            512,
+            512
+          ]
+        },
+        {
+          "id": "texture-049",
+          "dimensions": [
+            512,
+            512
+          ]
+        },
+        {
+          "id": "texture-050",
+          "dimensions": [
+            512,
+            512
+          ]
+        },
+        {
+          "id": "texture-051",
+          "dimensions": [
+            512,
+            512
+          ]
+        },
+        {
+          "id": "texture-052",
+          "dimensions": [
+            512,
+            512
+          ]
+        },
+        {
+          "id": "texture-053",
+          "dimensions": [
+            512,
+            512
+          ]
+        },
+        {
+          "id": "texture-054",
+          "dimensions": [
+            512,
+            512
+          ]
+        },
+        {
+          "id": "texture-055",
+          "dimensions": [
+            512,
+            512
+          ]
+        },
+        {
+          "id": "texture-056",
+          "dimensions": [
+            512,
+            512
+          ]
+        }
+      ]
+    }
+  }
+}

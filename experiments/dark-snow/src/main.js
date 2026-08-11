@@ -23,6 +23,8 @@ import { CameraRig } from "./core/camera.js";
 import { CharacterController } from "./character/controller.js";
 import { Character } from "./character/character.js";
 import { SnowContact } from "./character/snowContact.js";
+import { Vehicle } from "./vehicle/vehicle.js";
+import { VehicleContact } from "./vehicle/vehicleContact.js";
 import { SprayField } from "./vfx/particles.js";
 import { SurfWake } from "./vfx/surfWake.js";
 import { SpellSystem } from "./spells/spellSystem.js";
@@ -37,6 +39,17 @@ import * as loading from "./core/loading.js";
 
 // ------------------------------------------------------- module-scope scratch
 const _vel = new Vector3();
+
+function openSansaraSelector(currentWorld) {
+    const marker = "/experiments/";
+    const markerAt = location.pathname.indexOf(marker);
+    const rootPath = markerAt >= 0 ? location.pathname.slice(0, markerAt + 1) : "/";
+    const target = new URL(`${rootPath}rooms.html`, location.origin);
+    target.searchParams.set("travel", "1");
+    target.searchParams.set("current", currentWorld);
+    document.exitPointerLock?.();
+    location.assign(target.href);
+}
 
 async function boot() {
     const canvas = /** @type {HTMLCanvasElement} */ (document.getElementById("view"));
@@ -130,14 +143,32 @@ async function boot() {
 
     // The figure: skeleton, garment simulation, shell fur.
     const figure = new Character(scene, terrain, sky, shadows, character);
-    onChange("showCharacter", (v) => figure.setVisible(v));
+    // This world keeps Snowflow's original procedural traveller. The Sikh
+    // model remains outside Dark Snow until it has a genuinely compatible rig.
+    figure.setModel("original");
     figure.registerPrepass(depthPass);
+
+    await loading.phase("parking prototype vehicle", 0.72);
+    const vehicle = new Vehicle(scene, terrain, sky);
+    await vehicle.load(new URL("vehicles/kenney/suv.glb", document.baseURI).href);
+    // Same integration as the terrain, figure and wake: the car joins the depth
+    // prepass (so SSR / DOF / spray see it) and casts into the shadow cascades
+    // (so it is grounded rather than floating). Both no-op if the asset failed.
+    vehicle.registerPrepass(depthPass);
+    vehicle.registerShadows(shadows);
+    const syncCharacterVisibility = () => {
+        figure.setVisible(S.showCharacter && !vehicle.active);
+    };
+    onChange("showCharacter", syncCharacterVisibility);
+    syncCharacterVisibility();
 
     // Airborne snow: footfall kick now, the surf plume and spell spray later.
     const spray = new SprayField(scene, terrain, sky, shadows);
 
     // Feet and the surf groove write into the terrain state buffer through here.
     const contact = new SnowContact(character, terrain.deform, figure.figure, spray);
+    // The car's own snow contact: tyre tracks and thrown snow while driving.
+    const vehicleContact = new VehicleContact(vehicle, terrain.deform, spray);
 
     // The breaking wave, its bow crest and the plume it sheds.
     const wake = new SurfWake(scene, sky, shadows, character, spray, terrain);
@@ -163,7 +194,14 @@ async function boot() {
     const post = new PostChain(scene, rig.camera, depthPass, sky);
 
     const overlay = new Overlay({ rig, character });
-    initInput(canvas, { onToggleOverlay: () => overlay.toggle() });
+    initInput(canvas, {
+        onToggleOverlay: () => overlay.toggle(),
+        onToggleVehicle: () => {
+            if (vehicle.toggle(character)) syncCharacterVisibility();
+        },
+        onRecoverVehicle: () => vehicle.recover(),
+        onOpenWorlds: () => openSansaraSelector("dune2"),
+    });
 
     // ------------------------------------------------------------- warm-up
     // Everything that can compile, compiles here — behind the loading screen.
@@ -219,23 +257,31 @@ async function boot() {
         // of it — the overlay labels them `cpu` for that reason.
         const tFrame = performance.now();
 
-        character.update(dt, rig);
-        terrain.heightfield.clampToPlayArea(character.position);
+        if (!vehicle.active) {
+            character.update(dt, rig);
+            vehicle.resolveCharacterCollision(character);
+        }
+        vehicle.update(dt, character.position);
+        const mover = vehicle.active ? vehicle : character;
+        terrain.heightfield.clampToPlayArea(mover.position);
         // Pose and simulate before the contact pass: the footprints are stamped
         // at the boot's actual planted position, which only exists once the
         // figure has been solved.
         figure.update(dt);
-        contact.update(dt);
+        if (!vehicle.active) contact.update(dt);
+        // Guards internally on active/grounded; called every frame so it keeps
+        // its travelled-distance baseline fresh even while the player is on foot.
+        vehicleContact.update(dt);
         const tChar = performance.now();
 
-        _vel.copyFrom(character.velocity);
-        rig.update(dt, character.position, _vel, character.lean, character.speed01);
+        _vel.copyFrom(mover.velocity);
+        rig.update(dt, mover.position, _vel, mover.lean, mover.speed01);
 
         // Jitters the projection and republishes everything the screen-space
         // passes derive from the camera. Must be after the rig has moved and
         // before anything reads `scene.getTransformMatrix()` — which the depth
         // prepass and the beauty pass both do.
-        post.update(dt, character.streak01, rig.distance);
+        post.update(dt, mover.streak01, rig.distance);
         sky.update();
         sky.render(rig, time);
         shadows.update(rig.camera, sky.sunDir);
@@ -244,7 +290,7 @@ async function boot() {
         // writes are in the staging array when the simulation pass runs.
         spells.update(dt, rig.camera.position);
         const tSpells = performance.now();
-        terrain.update(rig.camera.position, character.position, dt);
+        terrain.update(rig.camera.position, mover.position, dt);
         const tTerrain = performance.now();
         // After the shadow refit, so the figure's uniforms carry this frame's
         // cascade matrices rather than last frame's.
@@ -286,7 +332,7 @@ async function boot() {
     setTimeout(() => overlay.resetSpikes(), 800);
 
     globalThis.DARK_SNOW = {
-        engine, scene, rig, character, figure, contact, spray, wake, spells,
+        engine, scene, rig, character, figure, vehicle, contact, spray, wake, spells,
         overlay, terrain, sky, shadows, post, depthPass,
         S, input, perfStats: stats,
     };

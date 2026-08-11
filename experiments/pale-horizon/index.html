@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#9ca9ad" />
+  <title>Pale Horizon — Sansara Flight Lab</title>
+  <link rel="stylesheet" href="./src/style.css" />
+</head>
+<body>
+  <canvas id="view" aria-label="Pale Horizon free-flight world"></canvas>
+
+  <div id="loading" role="status" aria-live="polite">
+    <div class="load-rule"></div>
+    <p>FLIGHT LAB / PH–01</p>
+    <h1>Pale Horizon</h1>
+    <span id="loadPhase">preparing airframe</span>
+  </div>
+
+  <header class="topline">
+    <a id="back" href="../../../rooms.html">← Sansara</a>
+    <span>PALE HORIZON <i>PH–01</i></span>
+    <button id="settingsButton" type="button" aria-label="Open settings">F1 / settings</button>
+  </header>
+
+  <section id="hud" aria-label="Flight instruments">
+    <div class="readout"><span>AIRSPEED</span><strong id="speed">000</strong><small>KT</small></div>
+    <div class="readout"><span>RAD ALT</span><strong id="altitude">0000</strong><small>FT</small></div>
+    <div class="readout"><span>VERT</span><strong id="vertical">+000</strong><small>FPM</small></div>
+    <div class="readout throttle"><span>THROTTLE</span><strong id="throttle">00</strong><small>%</small><i><b id="throttleBar"></b></i></div>
+    <div class="readout state"><span>STATE</span><strong id="state">GROUND</strong><small id="gearState">GEAR DOWN</small></div>
+  </section>
+
+  <div id="horizon" aria-hidden="true"><i class="left"></i><b></b><i class="right"></i><span></span></div>
+  <div id="notice" role="status" aria-live="polite"></div>
+
+  <div id="controls">
+    <span><b>SHIFT / CTRL</b> throttle</span><span><b>W/S · ↑/↓</b> pitch</span>
+    <span><b>A/D · ←/→</b> roll</span><span><b>Q/E</b> yaw</span>
+    <span><b>SPACE</b> afterburner</span><span><b>B</b> brake · <b>G</b> gear · <b>R</b> reset</span>
+    <span><b>TAB</b> worlds</span>
+  </div>
+
+  <aside id="settings" aria-hidden="true">
+    <div class="panel-head"><div><small>PH–01</small><h2>Flight setup</h2></div><button id="closeSettings" type="button" aria-label="Close settings">×</button></div>
+    <div class="panel-scroll">
+      <section>
+        <h3>Display</h3>
+        <label>Render quality<select id="quality"><option value="0.72">Performance</option><option value="1" selected>Balanced</option><option value="1.3">High</option></select></label>
+        <label>Camera distance <output id="cameraDistanceOut">28 m</output><input id="cameraDistance" type="range" min="18" max="46" step="1" value="28"></label>
+        <label>Camera response <output id="cameraResponseOut">4.5</output><input id="cameraResponse" type="range" min="2" max="9" step="0.5" value="4.5"></label>
+      </section>
+      <section>
+        <h3>Flight</h3>
+        <label>Flight assists<select id="assists"><option value="on" selected>On</option><option value="off">Off</option></select></label>
+        <label>Control sensitivity <output id="sensitivityOut">1.00</output><input id="sensitivity" type="range" min="0.55" max="1.65" step="0.05" value="1"></label>
+      </section>
+      <section>
+        <h3>Atmosphere</h3>
+        <label>Sun <output id="sunOut">3.4</output><input id="sun" type="range" min="0.5" max="5" step="0.1" value="3.4"></label>
+        <label>Exposure <output id="exposureOut">0.82</output><input id="exposure" type="range" min="0.5" max="1.4" step="0.02" value="0.82"></label>
+        <label>Fog <output id="fogOut">0.00011</output><input id="fog" type="range" min="0.00004" max="0.0005" step="0.00001" value="0.00011"></label>
+      </section>
+      <section>
+        <h3>Sound</h3>
+        <label>Engine audio<select id="audio"><option value="on" selected>On</option><option value="off">Off</option></select></label>
+      </section>
+      <div class="panel-actions"><button id="resetDefaults" type="button">Reset authored defaults</button><button id="resetFlight" type="button">Reset flight</button></div>
+    </div>
+  </aside>
+
+  <footer>
+    <a href="https://sketchfab.com/3d-models/f22-raptor-free-2a64abf0866a405c865466c7642ca689" target="_blank" rel="noreferrer">F-22 Raptor Free · NLM · CC BY 4.0</a>
+  </footer>
+  <script type="module" src="./src/main.js"></script>
+</body>
+</html>
