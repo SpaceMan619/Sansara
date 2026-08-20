@@ -120,6 +120,12 @@ export async function build({ THREE, loadGLB }) {
   traceTex.wrapS = traceTex.wrapT = THREE.ClampToEdgeWrapping;
   traceTex.magFilter = THREE.LinearFilter; traceTex.minFilter = THREE.LinearFilter;
   traceTex.colorSpace = THREE.NoColorSpace; traceTex.needsUpdate = true;
+  let traceDisposed = false;
+  function dispose(){
+    if (traceDisposed) return;
+    traceDisposed = true;
+    traceTex.dispose();
+  }
   let traceCenterX = 0, traceCenterZ = 0, previousX = 0, previousZ = 6;
   let traceClock = 0;
   const traceIndex = (x, z) => {
@@ -271,7 +277,7 @@ export async function build({ THREE, loadGLB }) {
     sandMat.uniforms.uTime.value+=dt; skyMat.uniforms.time.value+=dt; sandMat.uniforms.uTraceCenter.value.set(traceCenterX,traceCenterZ);
   }
   return {
-    root, spawn:[0,6], baked:false, update,
+    root, spawn:[0,6], baked:false, update, dispose,
     fog:[0x4c3024,0.0032], exposure:0.72, charScale:1.0, camDist:7.7,
     env:{wall:0x5b3c2c,panel:0xf3c28d,floor:0x6b3e25,intensity:0.42},
     lights:{ambient:0.28,hemi:0.45,dir:1.3,fill:0.15,sky:0xf2bd83,ground:0x321b12},

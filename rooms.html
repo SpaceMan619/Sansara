@@ -484,7 +484,8 @@ const camera = new THREE.PerspectiveCamera(50, innerWidth/innerHeight, 0.04, 500
 const loader = new GLTFLoader();
 const loadGLB = url => new Promise((res,rej)=>loader.load(url,res,undefined,rej));
 
-let scene, roomRoot, grid = null, baseFog = [0,0], roomUpdate = null, roomSun = null;
+let scene, roomRoot, grid = null, baseFog = [0,0], roomUpdate = null, roomCleanup = null, roomSun = null;
+let roomLoadToken = 0;
 let devLights = { ambient:null, hemi:null, key:null, fill:null };
 
 /* ==================== collision from geometry ===================
@@ -986,7 +987,23 @@ function disposeRoom(){
   roomRoot = null;
 }
 
+function runRoomCleanup(cleanup){
+  if (typeof cleanup !== 'function') return;
+  try { cleanup(); }
+  catch(err){ console.error('room cleanup failed', err); }
+}
+
+function stopRoomLifecycle(){
+  roomUpdate = null;
+  const cleanup = roomCleanup;
+  roomCleanup = null;
+  runRoomCleanup(cleanup);
+}
+
 async function loadRoom(key){
+  const loadToken = ++roomLoadToken;
+  stopRoomLifecycle();
+  if (loadToken !== roomLoadToken) return;
   const cfg = ROOMS[key];
   // Start each room from the shared baseline, then apply room-specific
   // tuning where a world needs its own movement or camera feel.
@@ -1001,18 +1018,25 @@ async function loadRoom(key){
 
   /* A room is either a file to load or a module that builds itself. Both
      hand back the same shape, so everything downstream is identical. */
-  let built = null, gltf = null;
+  let built = null, builtCleanup = null, gltf = null;
   if (cfg.module){
     try {
       setProgress(0.12, 'building the room');
       const mod = await import('./' + cfg.module);
       built = await mod.build({ THREE, loadGLB, renderer });
+      builtCleanup = built && typeof built.dispose === 'function' ? () => built.dispose() : null;
+      if (loadToken !== roomLoadToken){
+        runRoomCleanup(builtCleanup);
+        return;
+      }
       Object.assign(cfg, {
         baked: built.baked, fog: built.fog, exposure: built.exposure,
         charScale: built.charScale, camDist: built.camDist,
         env: built.env, lights: built.lights, spawn: built.spawn,
       });
     } catch(e){
+      runRoomCleanup(builtCleanup);
+      if (loadToken !== roomLoadToken) return;
       setProgress(1, 'unavailable');
       document.getElementById('loadName').textContent = cfg.label + " wouldn't build";
       document.getElementById('loadPhase').textContent = e.message;
@@ -1025,11 +1049,16 @@ async function loadRoom(key){
       else setProgress(Math.min(0.7, 0.05 + ev.loaded/6e6), 'loading the room');
     }, rej));
   } catch(e){
+    if (loadToken !== roomLoadToken) return;
     setProgress(1, 'unavailable');
     document.getElementById('loadName').textContent = `${cfg.label} isn't published here yet`;
     document.getElementById('loadPhase').textContent = 'not published here yet';
     buildHud();
     return;                     // keep the previous room's grid usable
+  }
+  if (loadToken !== roomLoadToken){
+    runRoomCleanup(builtCleanup);
+    return;
   }
   setProgress(0.84, 'setting the light');
   roomRoot = built ? built.root : gltf.scene;
@@ -1099,7 +1128,6 @@ async function loadRoom(key){
     scene.add(fill);
     devLights = { ambient:amb, hemi, key, fill };
   }
-  roomUpdate = built && built.update ? built.update : null;
   roomSun = null;
   if (!(built && built.sun && built.sun.shadow)) renderer.shadowMap.enabled = false;
   if (built && built.sun){
@@ -1136,6 +1164,10 @@ async function loadRoom(key){
 
   setProgress(0.9, 'finding the floor');
   await new Promise(r=>setTimeout(r,0));      // let the loader paint before the blocking pass
+  if (loadToken !== roomLoadToken){
+    runRoomCleanup(builtCleanup);
+    return;
+  }
   /* A built room already knows its own shape, so it hands over an analytic
      collider — cheaper and exact. Loaded scenes have to have one inferred. */
   grid = built && built.collision
@@ -1185,6 +1217,8 @@ async function loadRoom(key){
   // room would finish loading without ever capturing its card image.
   setTimeout(()=>{ try { captureThumb(key); } catch(e){} }, 80);
   setTimeout(hideLoader, 260);
+  roomUpdate = built && built.update ? built.update : null;
+  roomCleanup = builtCleanup;
 }
 let roomStats = '';
 
@@ -1198,6 +1232,8 @@ const COYOTE = 0.12, JUMP_BUFFER = 0.15, RADIUS = 0.34;
 const JUMP_TAKEOFF = 0.42, JUMP_CONTACT = 1.58;
 const UAL_TAKEOFF = 0.17, UAL_LAND_RECOVERY = 0.83;
 const pos = new THREE.Vector3(), vel = new THREE.Vector3();
+const moveFwd = new THREE.Vector3(), moveRight = new THREE.Vector3(), wish = new THREE.Vector3();
+const moveTarget = new THREE.Vector3(), cameraTarget = new THREE.Vector3();
 let vy = 0, grounded = true, heading = Math.PI, coyoteT = 0, jumpBufT = 0;
 let windupT = 0, landT = 0, dancing = false, moonwalking = false;
 let camYaw = 0.6, camPitch = 0.22, dragging = false, px = 0, py = 0;
@@ -1330,23 +1366,23 @@ function tick(){
   elapsed += dt;
   if (!grid) { renderer.render(scene, camera); return; }
 
-  const fwd = new THREE.Vector3(-Math.sin(camYaw),0,-Math.cos(camYaw));
-  const right = new THREE.Vector3(-fwd.z,0,fwd.x);
-  const wish = new THREE.Vector3();
-  if (keys['KeyW']) wish.add(fwd);
-  if (keys['KeyS']) wish.sub(fwd);
-  if (keys['KeyD']) wish.add(right);
-  if (keys['KeyA']) wish.sub(right);
+  moveFwd.set(-Math.sin(camYaw),0,-Math.cos(camYaw));
+  moveRight.set(-moveFwd.z,0,moveFwd.x);
+  wish.set(0,0,0);
+  if (keys['KeyW']) wish.add(moveFwd);
+  if (keys['KeyS']) wish.sub(moveFwd);
+  if (keys['KeyD']) wish.add(moveRight);
+  if (keys['KeyA']) wish.sub(moveRight);
   const emoting = dancing || moonwalking;
   const hasInput = wish.lengthSq()>0 && !emoting;
   if (hasInput) wish.normalize();
   const running = (keys['ShiftLeft']||keys['ShiftRight']) && hasInput;
   const targetSpeed = hasInput ? (running?TUNE.runSpeed:TUNE.walkSpeed) : 0;
 
-  const target = wish.clone().multiplyScalar(targetSpeed);
+  moveTarget.copy(wish).multiplyScalar(targetSpeed);
   const rate = (grounded ? (hasInput?TUNE.accel:TUNE.decel) : TUNE.airAccel) * dt;
-  vel.x += THREE.MathUtils.clamp(target.x-vel.x, -rate, rate);
-  vel.z += THREE.MathUtils.clamp(target.z-vel.z, -rate, rate);
+  vel.x += THREE.MathUtils.clamp(moveTarget.x-vel.x, -rate, rate);
+  vel.z += THREE.MathUtils.clamp(moveTarget.z-vel.z, -rate, rate);
   moveWithCollision(vel.x*dt, vel.z*dt);
 
   jumpBufT = Math.max(0, jumpBufT-dt);
@@ -1467,7 +1503,8 @@ function tick(){
   // look down on the level from outside it.
   if (!cameraXray && grid.ceiling !== null && grid.ceiling !== undefined)
     cy = Math.min(cy, grid.ceiling - 0.28);
-  camera.position.lerp(new THREE.Vector3(cx,cy,cz), Math.min(1,14*dt));
+  cameraTarget.set(cx,cy,cz);
+  camera.position.lerp(cameraTarget, Math.min(1,14*dt));
   camera.lookAt(pos.x, cameraAnchorY+1.2, pos.z);
 
   if (roomUpdate) roomUpdate(dt, pos);
@@ -1852,6 +1889,7 @@ async function goTo(k){
     wipe.classList.add('loading');
     roomKey = k;
     history.replaceState(null,'',`?room=${k}`);
+    if (k === 'dune2' || k === 'paleHorizon') stopRoomLifecycle();
     if (k === 'dune2') {
       // Dark Snow is the first room to use the forked Babylon/WebGPU renderer.
       // It lives as a static Vite build so Sansara's selector remains the

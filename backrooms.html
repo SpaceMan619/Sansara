@@ -487,18 +487,20 @@ async function loadAvatar(){
 const clock = new THREE.Clock();
 let fpsT=0, frames=0, flicker=0;
 const _lampCol = new THREE.Color();
+const moveFwd = new THREE.Vector3(), moveRight = new THREE.Vector3(), wish = new THREE.Vector3();
+const cameraTarget = new THREE.Vector3();
 window.__backrooms = { keys, pos, step:()=>tick() };
 
 function tick(){
   const dt = Math.min(clock.getDelta(), 0.05);
 
-  const fwd = new THREE.Vector3(-Math.sin(yaw),0,-Math.cos(yaw));
-  const right = new THREE.Vector3(-fwd.z,0,fwd.x);
-  const wish = new THREE.Vector3();
-  if (keys['KeyW']) wish.add(fwd);
-  if (keys['KeyS']) wish.sub(fwd);
-  if (keys['KeyD']) wish.add(right);
-  if (keys['KeyA']) wish.sub(right);
+  moveFwd.set(-Math.sin(yaw),0,-Math.cos(yaw));
+  moveRight.set(-moveFwd.z,0,moveFwd.x);
+  wish.set(0,0,0);
+  if (keys['KeyW']) wish.add(moveFwd);
+  if (keys['KeyS']) wish.sub(moveFwd);
+  if (keys['KeyD']) wish.add(moveRight);
+  if (keys['KeyA']) wish.sub(moveRight);
   const hasInput = wish.lengthSq()>0;
   if (hasInput) wish.normalize();
 
@@ -581,7 +583,8 @@ function tick(){
   const cx = pos.x + Math.sin(yaw)*Math.cos(pitch)*dist;
   const cz = pos.z + Math.cos(yaw)*Math.cos(pitch)*dist;
   const cy = pos.y + EYE + Math.sin(pitch)*dist;
-  camera.position.lerp(new THREE.Vector3(cx,cy,cz), Math.min(1,14*dt));
+  cameraTarget.set(cx,cy,cz);
+  camera.position.lerp(cameraTarget, Math.min(1,14*dt));
   camera.lookAt(pos.x, pos.y+1.2, pos.z);
 
   renderer.render(scene,camera);

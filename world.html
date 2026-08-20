@@ -233,9 +233,10 @@ function groundAt(x,z){
     ? hA + tx*(hD-hA) + tz*(hB-hA)
     : hC + (1-tx)*(hB-hC) + (1-tz)*(hD-hC);
 }
+const groundNormalScratch = new THREE.Vector3();
 function groundNormal(x,z){
   const e = CELL;
-  return new THREE.Vector3(
+  return groundNormalScratch.set(
     groundAt(x-e,z)-groundAt(x+e,z), 2*e, groundAt(x,z-e)-groundAt(x,z+e)).normalize();
 }
 
@@ -633,6 +634,8 @@ addEventListener('wheel',e=>{ TUNE.camDist = THREE.MathUtils.clamp(TUNE.camDist 
 
 const clock = new THREE.Clock();
 let elapsed = 0, fpsT = 0, frames = 0;
+const moveFwd = new THREE.Vector3(), moveRight = new THREE.Vector3(), wish = new THREE.Vector3();
+const cameraTarget = new THREE.Vector3();
 window.__world = { keys, pos, vel, TUNE, THREE,
   get avatar(){return avatar;}, get _actions(){return actions;}, get _mixer(){return mixer;}, get state(){return currentAction;},
   get clips(){return Object.keys(actions);},
@@ -646,13 +649,13 @@ function tick(){
   elapsed += dt;
 
   /* ---- input, in camera space ---- */
-  const fwd = new THREE.Vector3(-Math.sin(camYaw), 0, -Math.cos(camYaw));
-  const right = new THREE.Vector3(-fwd.z, 0, fwd.x);
-  const wish = new THREE.Vector3();
-  if (keys['KeyW']) wish.add(fwd);
-  if (keys['KeyS']) wish.sub(fwd);
-  if (keys['KeyD']) wish.add(right);
-  if (keys['KeyA']) wish.sub(right);
+  moveFwd.set(-Math.sin(camYaw), 0, -Math.cos(camYaw));
+  moveRight.set(-moveFwd.z, 0, moveFwd.x);
+  wish.set(0,0,0);
+  if (keys['KeyW']) wish.add(moveFwd);
+  if (keys['KeyS']) wish.sub(moveFwd);
+  if (keys['KeyD']) wish.add(moveRight);
+  if (keys['KeyA']) wish.sub(moveRight);
   const emoting = dancing || moonwalking;
   const hasInput = wish.lengthSq() > 0 && !emoting;
   if (hasInput) wish.normalize();
@@ -762,7 +765,8 @@ function tick(){
   const cz = pos.z + Math.cos(camYaw)*Math.cos(camPitch)*TUNE.camDist;
   const cy = Math.max(pos.y + TUNE.camHeight + Math.sin(camPitch)*TUNE.camDist,
                       groundAt(cx,cz) + 1.2);
-  camera.position.lerp(new THREE.Vector3(cx, cy, cz), Math.min(1, 12*dt));
+  cameraTarget.set(cx, cy, cz);
+  camera.position.lerp(cameraTarget, Math.min(1, 12*dt));
   camera.lookAt(pos.x, pos.y+1.15, pos.z);
 
   sun.position.set(pos.x-60, pos.y+46, pos.z+34);
