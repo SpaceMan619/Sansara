@@ -13,6 +13,7 @@ const RUNWAY_HALF_WIDTH = 36;
 const RUNWAY_HALF_LENGTH = 960;
 const RUNWAY_SHOULDER_X = 112;
 const RUNWAY_SHOULDER_Z = 260;
+export const WATER_LEVEL = -42;
 
 const clamp01 = (v) => Math.min(1, Math.max(0, v));
 const smooth01 = (v) => {
@@ -75,6 +76,110 @@ function fbm(x, z, octaves, gain = 0.5, lacunarity = 2.03) {
   return total / weight;
 }
 
+const WATER_CELL_SIZE = 9000;
+const RIVER_WATER_RADIUS = 245;
+const RIVER_VALLEY_RADIUS = 1450;
+
+export function riverCenterXAt(z) {
+  // Keep the opening runway in a dry mountain basin. The river becomes visible
+  // after takeoff rather than reading as an exposed plane beneath the runway.
+  return -2600
+    + Math.sin(z * 0.00039 + 0.7) * 520
+    + Math.sin(z * 0.00107 - 1.4) * 105;
+}
+
+function lakeBasinAt(gx, gz) {
+  const seed = hash2(gx, gz);
+  // Sparse enough that a flight reads distinct lakes rather than flooded
+  // noise. The old 75% placement rate was the main visual failure.
+  if ((seed & 7) > 2) return null;
+  const cx = (gx + 0.22 + ((seed >>> 4) & 1023) / 1820) * WATER_CELL_SIZE;
+  const cz = (gz + 0.22 + ((seed >>> 14) & 1023) / 1820) * WATER_CELL_SIZE;
+  // Keep the authored runway basin dry and readable on first load.
+  if (Math.abs(cx) < 1700 && Math.abs(cz - RUNWAY_CENTER_Z) < 2800) return null;
+  return {
+    id: `${gx}:${gz}`,
+    cx,
+    cz,
+    radiusX: 1050 + ((seed >>> 8) & 255) * 3.2,
+    radiusZ: 850 + ((seed >>> 20) & 255) * 3.4,
+  };
+}
+
+function forNearbyLakes(x, z, visitor) {
+  const cellX = Math.floor(x / WATER_CELL_SIZE);
+  const cellZ = Math.floor(z / WATER_CELL_SIZE);
+  for (let dz = -1; dz <= 1; dz++) {
+    for (let dx = -1; dx <= 1; dx++) {
+      const basin = lakeBasinAt(cellX + dx, cellZ + dz);
+      if (!basin) continue;
+      const distance = Math.hypot(
+        (x - basin.cx) / basin.radiusX,
+        (z - basin.cz) / basin.radiusZ,
+      );
+      visitor(distance, basin);
+    }
+  }
+}
+
+/** Lake descriptors inside a square search radius, for matching water meshes. */
+export function lakeBasinsNear(x, z, radius = 9000) {
+  const minX = Math.floor((x - radius) / WATER_CELL_SIZE) - 1;
+  const maxX = Math.floor((x + radius) / WATER_CELL_SIZE) + 1;
+  const minZ = Math.floor((z - radius) / WATER_CELL_SIZE) - 1;
+  const maxZ = Math.floor((z + radius) / WATER_CELL_SIZE) + 1;
+  const basins = [];
+  for (let gz = minZ; gz <= maxZ; gz++) {
+    for (let gx = minX; gx <= maxX; gx++) {
+      const basin = lakeBasinAt(gx, gz);
+      if (!basin) continue;
+      const reachX = basin.radiusX * 0.24;
+      const reachZ = basin.radiusZ * 0.24;
+      if (Math.abs(basin.cx - x) > radius + reachX) continue;
+      if (Math.abs(basin.cz - z) > radius + reachZ) continue;
+      basins.push(basin);
+    }
+  }
+  return basins;
+}
+
+/** Water coverage only; terrain shaping happens separately below. */
+export function waterMaskAt(x, z) {
+  const riverDistance = Math.abs(x - riverCenterXAt(z));
+  let mask = 1 - smooth01((riverDistance - RIVER_WATER_RADIUS + 45) / 90);
+  forNearbyLakes(x, z, (distance) => {
+    mask = Math.max(mask, 1 - smooth01((distance - 0.18) / 0.09));
+  });
+  return clamp01(mask);
+}
+
+function carveWaterBodies(rawHeight, x, z) {
+  let height = rawHeight;
+
+  // A wide quadratic valley limits the river bank to a plausible grade. It
+  // can cross high country without slicing a vertical curtain through it.
+  const riverDistance = Math.abs(x - riverCenterXAt(z));
+  if (riverDistance < RIVER_VALLEY_RADIUS) {
+    const t = riverDistance / RIVER_VALLEY_RADIUS;
+    const riverProfile = WATER_LEVEL - 10 + t * t * 350;
+    const carved = Math.min(height, riverProfile);
+    const bankBlend = 1 - smooth01((t - 0.72) / 0.28);
+    height = lerp(height, carved, bankBlend);
+  }
+
+  // Lakes use the same rule: a small submerged centre inside a much broader
+  // bowl. At the outer edge the profile has already climbed over 200 metres,
+  // so it meets mountain terrain without needles, overhangs or hanging strips.
+  forNearbyLakes(x, z, (distance) => {
+    if (distance >= 2.2) return;
+    const lakeProfile = WATER_LEVEL - 9 + distance * distance * 180;
+    const carved = Math.min(height, lakeProfile);
+    const bankBlend = 1 - smooth01((distance - 1.35) / 0.85);
+    height = lerp(height, carved, bankBlend);
+  });
+  return height;
+}
+
 /**
  * 0 on the runway, 1 on untouched terrain. The wide smooth shoulder prevents
  * a hard trench where the runway meets the procedural field.
@@ -103,17 +208,32 @@ export function terrainHeight(x, z) {
   const wx = x + warpX;
   const wz = z + warpZ;
 
-  const continental = fbm(wx * 0.000105 + 7.1, wz * 0.000105 - 19.3, 5, 0.54) * 150;
-  const ridgeSignal = 1 - Math.abs(fbm(wx * 0.00031 - 41.8, wz * 0.00031 + 8.6, 5, 0.54));
-  const ridgeMask = smooth01(fbm(wx * 0.000075 + 72.4, wz * 0.000075 - 63.1, 4) * 0.9 + 0.43);
-  const mountains = Math.pow(clamp01((ridgeSignal - 0.27) / 0.73), 2.35) * 620 * ridgeMask;
+  const continental = fbm(wx * 0.000095 + 7.1, wz * 0.000095 - 19.3, 4, 0.52) * 135;
+  // Mountain silhouettes must come from low frequencies only. Feeding five
+  // octaves into a 620 m displacement let a 45 m grid step jump by almost
+  // 400 m, which produced the needles visible in flight.
+  const ridgeSignal = 1 - Math.abs(fbm(
+    wx * 0.00015 - 41.8, wz * 0.00015 + 8.6, 2, 0.48, 1.85,
+  ));
+  const ridgeMask = smooth01(
+    fbm(wx * 0.000060 + 72.4, wz * 0.000060 - 63.1, 2, 0.50, 1.88) * 0.9 + 0.43,
+  );
+  const mountains = Math.pow(clamp01((ridgeSignal - 0.22) / 0.78), 1.75)
+    * 390 * ridgeMask;
 
-  const rolling = fbm(wx * 0.00082 + 16.3, wz * 0.00082 + 44.9, 5, 0.52) * 64;
-  const drainage = Math.pow(Math.abs(fbm(wx * 0.00046 - 23.4, wz * 0.00046 + 91.7, 4)), 1.7) * -58;
-  const outcrop = Math.pow(clamp01((Math.abs(noise2(wx * 0.0017, wz * 0.0017)) - 0.34) / 0.66), 2) * 34;
-  const detail = fbm(x * 0.0041 + 3.2, z * 0.0041 - 8.7, 3, 0.46) * 7.5;
+  const rolling = fbm(wx * 0.00062 + 16.3, wz * 0.00062 + 44.9, 3, 0.50) * 54;
+  const drainage = Math.pow(
+    Math.abs(fbm(wx * 0.00036 - 23.4, wz * 0.00036 + 91.7, 3)), 1.7,
+  ) * -42;
+  const outcrop = Math.pow(
+    clamp01((Math.abs(noise2(wx * 0.0012, wz * 0.0012)) - 0.38) / 0.62), 2,
+  ) * 20;
+  const detail = fbm(x * 0.0032 + 3.2, z * 0.0032 - 8.7, 2, 0.44) * 5.0;
 
-  const raw = continental + mountains + rolling + drainage + outcrop + detail - 24;
+  let raw = continental + mountains + rolling + drainage + outcrop + detail - 12;
+  // Natural noise stays above the water plane. Purpose-built bowls then lower
+  // only the river and lake centres, with several hundred metres of bank run.
+  raw = carveWaterBodies(Math.max(raw, WATER_LEVEL + 12), x, z);
   const runwayBlend = runwayTerrainBlend(x, z);
   return raw * runwayBlend;
 }

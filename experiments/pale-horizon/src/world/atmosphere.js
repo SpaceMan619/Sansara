@@ -1,118 +1,206 @@
-import { Mesh } from "@babylonjs/core/Meshes/mesh.js";
+import { ShaderStore } from "@babylonjs/core/Engines/shaderStore.js";
+import { Constants } from "@babylonjs/core/Engines/constants.js";
+import { ProceduralTexture } from "@babylonjs/core/Materials/Textures/Procedurals/proceduralTexture.js";
+import { ShaderMaterial } from "@babylonjs/core/Materials/shaderMaterial.js";
+import { ShaderLanguage } from "@babylonjs/core/Materials/shaderLanguage.js";
 import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder.js";
-import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial.js";
-import { DynamicTexture } from "@babylonjs/core/Materials/Textures/dynamicTexture.js";
-import { Texture } from "@babylonjs/core/Materials/Textures/texture.js";
+import { Vector2, Vector3 } from "@babylonjs/core/Maths/math.vector.js";
 import { Color3 } from "@babylonjs/core/Maths/math.color.js";
-import { Vector3 } from "@babylonjs/core/Maths/math.vector.js";
 
+// Pale Horizon now uses Dark Snow's actual atmospheric scattering and solar
+// shader sources. Keeping these as imports, rather than rewritten copies, means
+// future fixes to Dark Snow's sun model reach both experiments.
+import noiseSource from "../../../dark-snow/src/shaders/lib/noise.wgsl?raw";
+import atmosphereSource from "../../../dark-snow/src/shaders/lib/atmosphere.wgsl?raw";
+import shadingSource from "../../../dark-snow/src/shaders/lib/shading.wgsl?raw";
+import ridgeSource from "../../../dark-snow/src/shaders/lib/ridge.wgsl?raw";
+import skyBakeSource from "../../../dark-snow/src/shaders/skyBake.fragment.wgsl?raw";
+import skyVertexSource from "../../../dark-snow/src/shaders/sky.vertex.wgsl?raw";
+import skyFragmentSource from "../../../dark-snow/src/shaders/sky.fragment.wgsl?raw";
+
+ShaderStore.IncludesShadersStoreWGSL.snowNoise = noiseSource;
+ShaderStore.IncludesShadersStoreWGSL.snowAtmosphere = atmosphereSource;
+ShaderStore.IncludesShadersStoreWGSL.snowShading = shadingSource;
+ShaderStore.IncludesShadersStoreWGSL.snowRidge = ridgeSource;
+ShaderStore.ShadersStoreWGSL.paleDarkSkyBakePixelShader = skyBakeSource;
+ShaderStore.ShadersStoreWGSL.paleDarkSkyVertexShader = skyVertexSource;
+ShaderStore.ShadersStoreWGSL.paleDarkSkyPixelShader = skyFragmentSource;
+
+const SUN_SCALE_BASE = 5.5;
 const DEG = Math.PI / 180;
+const EMPTY_SH = new Float32Array(36);
 
-function clamp01(value) {
-  return Math.min(1, Math.max(0, value));
+function waitUntilReady(object, label) {
+  return new Promise((resolve, reject) => {
+    const started = performance.now();
+    const poll = () => {
+      try {
+        if (object.isReady()) {
+          resolve();
+          return;
+        }
+      } catch (error) {
+        reject(new Error(`${label} failed: ${error.message}`));
+        return;
+      }
+      if (performance.now() - started > 25000) {
+        reject(new Error(`${label} did not compile within 25 seconds`));
+        return;
+      }
+      requestAnimationFrame(poll);
+    };
+    poll();
+  });
 }
 
-function smoothstep(low, high, value) {
-  const t = clamp01((value - low) / Math.max(1e-6, high - low));
-  return t * t * (3 - 2 * t);
-}
+export class DarkSnowAtmosphere {
+  constructor(scene, {
+    azimuth = 118,
+    elevation = 13,
+    intensity = 3.0,
+    warmth = 1,
+  } = {}) {
+    this.scene = scene;
+    this.azimuth = azimuth;
+    this.elevation = elevation;
+    this.intensity = intensity;
+    this.warmth = warmth;
+    this.sunDirection = new Vector3(0, 0.2, 1);
+    this.sunColor = new Color3(1, 0.85, 0.66);
+    this.sunRadiance = new Color3(1, 1, 1);
+    this.sunScale = 1;
+    this.groundBounce = new Color3(0, 0, 0);
+    this.dirty = true;
 
-/**
- * A camera-centred sky painted from one physical sun direction. The broad
- * aureole is baked into the sky itself, so it cannot read as a flat billboard
- * floating in front of the terrain.
- */
-export function createAtmosphere(scene, {
-  azimuth = 118,
-  elevation = 13,
-  diameter = 18000,
-} = {}) {
-  const az = azimuth * DEG;
-  const el = elevation * DEG;
-  const cosElevation = Math.cos(el);
-  const sunDirection = new Vector3(
-    Math.sin(az) * cosElevation,
-    Math.sin(el),
-    Math.cos(az) * cosElevation,
-  ).normalize();
+    this.lut = new ProceduralTexture(
+      "pale-dark-snow-sky-lut",
+      { width: 512, height: 256 },
+      "paleDarkSkyBake",
+      scene,
+      {
+        generateMipMaps: true,
+        type: Constants.TEXTURETYPE_HALF_FLOAT,
+        format: Constants.TEXTUREFORMAT_RGBA,
+        samplingMode: Constants.TEXTURE_TRILINEAR_SAMPLINGMODE,
+        shaderLanguage: ShaderLanguage.WGSL,
+        skipSceneRegistration: true,
+      },
+    );
+    this.lut.wrapU = Constants.TEXTURE_WRAP_ADDRESSMODE;
+    this.lut.wrapV = Constants.TEXTURE_CLAMP_ADDRESSMODE;
+    this.lut.refreshRate = 0;
 
-  const width = 1024;
-  const height = 512;
-  const texture = new DynamicTexture("pale-sky-lut", { width, height }, scene, false);
-  const context = texture.getContext();
-  const image = context.createImageData(width, height);
+    this.mesh = MeshBuilder.CreateBox("pale-dark-snow-sky", { size: 2 }, scene);
+    this.mesh.alwaysSelectAsActiveMesh = true;
+    this.mesh.isPickable = false;
 
-  for (let y = 0; y < height; y++) {
-    const v = (y + 0.5) / height;
-    const theta = v * Math.PI;
-    const dy = Math.cos(theta);
-    const horizontal = Math.sin(theta);
-    const above = smoothstep(-0.09, 0.55, dy);
-    const zenith = smoothstep(0.02, 0.92, dy);
-    const horizonBand = Math.exp(-Math.abs(dy) * 7.2);
-
-    for (let x = 0; x < width; x++) {
-      const u = (x + 0.5) / width;
-      const phi = (1 - u) * Math.PI * 2;
-      const dx = Math.cos(phi) * horizontal;
-      const dz = Math.sin(phi) * horizontal;
-      const sunDot = dx * sunDirection.x + dy * sunDirection.y + dz * sunDirection.z;
-      const aureole = Math.exp(-(1 - sunDot) * 34);
-      const innerGlow = Math.exp(-(1 - sunDot) * 520);
-      const disc = smoothstep(Math.cos(1.05 * DEG), Math.cos(0.42 * DEG), sunDot);
-
-      // Layered horizon variation gives the air depth without placing opaque
-      // cloud meshes across the view. It stays faint enough to avoid shimmer.
-      const hazeNoise = (
-        Math.sin(phi * 5.0 + Math.sin(phi * 2.0) * 1.7)
-        + Math.sin(phi * 11.0 - 1.8) * 0.42
-        + Math.sin(phi * 23.0 + 0.6) * 0.16
-      ) * 0.5 + 0.5;
-      const haze = horizonBand * smoothstep(-0.15, 0.45, dy) * hazeNoise;
-
-      let r = 0.27 + above * 0.26 - zenith * 0.18;
-      let g = 0.34 + above * 0.30 - zenith * 0.16;
-      let b = 0.40 + above * 0.35 - zenith * 0.10;
-      r += horizonBand * 0.22 + haze * 0.055;
-      g += horizonBand * 0.18 + haze * 0.052;
-      b += horizonBand * 0.12 + haze * 0.050;
-      r += aureole * 0.50 + innerGlow * 0.58 + disc * 0.62;
-      g += aureole * 0.36 + innerGlow * 0.48 + disc * 0.58;
-      b += aureole * 0.20 + innerGlow * 0.30 + disc * 0.48;
-
-      const offset = (y * width + x) * 4;
-      image.data[offset] = Math.round(clamp01(r) * 255);
-      image.data[offset + 1] = Math.round(clamp01(g) * 255);
-      image.data[offset + 2] = Math.round(clamp01(b) * 255);
-      image.data[offset + 3] = 255;
-    }
+    this.material = new ShaderMaterial(
+      "pale-dark-snow-sky-material",
+      scene,
+      { vertex: "paleDarkSky", fragment: "paleDarkSky" },
+      {
+        attributes: ["position"],
+        uniforms: [
+          "viewProjection", "cameraPosition", "skyScale", "sunDir",
+          "sunColor", "sunIntensity", "time", "windDir", "cloudAmount",
+          "sunRadiance", "shR", "ambientIntensity", "ridgeAmp",
+          "fogDensity", "fogHeightFalloff", "fogStart", "aerialStrength",
+        ],
+        samplers: ["skyLUT"],
+        shaderLanguage: ShaderLanguage.WGSL,
+      },
+    );
+    this.material.backFaceCulling = false;
+    this.material.disableDepthWrite = true;
+    this.material.setTexture("skyLUT", this.lut);
+    this.material.setArray4("shR", EMPTY_SH);
+    this.mesh.material = this.material;
+    this.syncSun();
   }
 
-  context.putImageData(image, 0, 0);
-  texture.wrapU = Texture.WRAP_ADDRESSMODE;
-  texture.wrapV = Texture.CLAMP_ADDRESSMODE;
-  texture.update(false);
+  syncSun() {
+    const azimuth = this.azimuth * DEG;
+    const elevation = this.elevation * DEG;
+    const cosElevation = Math.cos(elevation);
+    this.sunDirection.set(
+      Math.sin(azimuth) * cosElevation,
+      Math.sin(elevation),
+      Math.cos(azimuth) * cosElevation,
+    ).normalize();
+    this.sunScale = this.intensity * SUN_SCALE_BASE;
 
-  const mesh = MeshBuilder.CreateSphere("physical-sky", {
-    diameter,
-    segments: 48,
-    sideOrientation: Mesh.BACKSIDE,
-  }, scene);
-  mesh.infiniteDistance = true;
-  mesh.alwaysSelectAsActiveMesh = true;
-  mesh.isPickable = false;
-  mesh.renderingGroupId = 0;
+    const zenithDegrees = Math.acos(Math.min(1, Math.max(-1, this.sunDirection.y))) / DEG;
+    const denominator = Math.cos(zenithDegrees * DEG)
+      + 0.50572 * Math.pow(Math.max(0.001, 96.07995 - zenithDegrees), -1.6364);
+    const airMass = Math.min(denominator > 0 ? 1 / denominator : 40, 40);
+    const tauRayleigh = [0.0464, 0.108, 0.265];
+    const tauMie = 0.0252;
+    const r = Math.exp(-(tauRayleigh[0] * this.warmth + tauMie) * airMass);
+    const g = Math.exp(-(tauRayleigh[1] * this.warmth + tauMie) * airMass);
+    const b = Math.exp(-(tauRayleigh[2] * this.warmth + tauMie) * airMass);
+    this.sunRadiance.set(r * this.sunScale, g * this.sunScale, b * this.sunScale);
+    const maximum = Math.max(r, g, b) || 1;
+    this.sunColor.set(r / maximum, g / maximum, b / maximum);
+    this.groundBounce.set(
+      this.sunRadiance.r * this.sunDirection.y * 0.10,
+      this.sunRadiance.g * this.sunDirection.y * 0.12,
+      this.sunRadiance.b * this.sunDirection.y * 0.17,
+    );
+  }
 
-  const material = new StandardMaterial("physical-sky-material", scene);
-  material.disableLighting = true;
-  material.disableDepthWrite = true;
-  material.backFaceCulling = false;
-  material.fogEnabled = false;
-  material.diffuseColor = Color3.Black();
-  material.specularColor = Color3.Black();
-  material.emissiveColor = Color3.White();
-  material.emissiveTexture = texture;
-  mesh.material = material;
+  async solve() {
+    this.syncSun();
+    await waitUntilReady(this.lut, "Dark Snow atmosphere");
+    this.bake();
+    this.dirty = false;
+  }
 
-  return { mesh, material, texture, sunDirection };
+  bake() {
+    this.lut.setVector3("sunDir", this.sunDirection);
+    this.lut.setFloat("sunIntensity", this.sunScale);
+    this.lut.setColor3("groundBounce", this.groundBounce);
+    this.lut.render();
+  }
+
+  setIntensity(value) {
+    if (Math.abs(value - this.intensity) < 1e-5) return;
+    this.intensity = value;
+    this.syncSun();
+    this.dirty = true;
+  }
+
+  render(camera, time) {
+    if (this.dirty && this.lut.isReady()) {
+      this.bake();
+      this.dirty = false;
+    }
+    const material = this.material;
+    material.setVector3("cameraPosition", camera.position);
+    material.setFloat("skyScale", camera.maxZ * 0.5);
+    material.setVector3("sunDir", this.sunDirection);
+    material.setColor3("sunColor", this.sunColor);
+    material.setFloat("sunIntensity", this.sunScale);
+    material.setFloat("time", time);
+    material.setVector2("windDir", new Vector2(0.35, 0.94));
+    material.setFloat("cloudAmount", 0.30);
+    material.setColor3("sunRadiance", this.sunRadiance);
+    material.setFloat("ambientIntensity", 0);
+    material.setFloat("ridgeAmp", 0);
+    material.setFloat("fogDensity", 0);
+    material.setFloat("fogHeightFalloff", 0.04);
+    material.setFloat("fogStart", 0);
+    material.setFloat("aerialStrength", 0);
+  }
+
+  dispose() {
+    this.lut.dispose();
+    this.mesh.dispose();
+    this.material.dispose();
+  }
+}
+
+export async function createAtmosphere(scene, options) {
+  const atmosphere = new DarkSnowAtmosphere(scene, options);
+  await atmosphere.solve();
+  return atmosphere;
 }

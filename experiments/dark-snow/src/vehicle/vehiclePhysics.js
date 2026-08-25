@@ -17,6 +17,7 @@ const ANTI_ROLL = 8000;
 const LONG_STIFFNESS = 62000;
 const LAT_STIFFNESS = 52000;
 const ROLLING_COEFFICIENT = 0.022;
+const LAUNCH_FORCE_END_SPEED = 3.2;
 const MAX_STEER_LOW = 0.52;
 const MAX_STEER_HIGH = 0.15;
 const MAX_REVERSE_SPEED = 8;
@@ -174,8 +175,11 @@ export class VehiclePhysics {
     }
 
     settleOnTerrain(clearance) {
-        this.position.y = this.terrain.heightAt(this.position.x, this.position.z)
-            + WHEEL_RADIUS + REST_LENGTH;
+        // Spawn parallel to the local snow surface. Starting every car dead
+        // upright leaves the uphill axle buried and the downhill axle hanging
+        // on sloped dunes, which makes the chassis collision fight the tyres
+        // before the driver has even touched the throttle.
+        this._placeUpright(0.08);
         this.previousPosition.copyFrom(this.position);
         this.visualPosition.copyFrom(this.position);
         for (let i = 0; i < 180; i++) this._step(FIXED_STEP);
@@ -432,7 +436,17 @@ export class VehiclePhysics {
         if (!Number.isFinite(yaw)) yaw = 0;
         const ground = this.terrain.heightAt(this.position.x, this.position.z);
         const safeGround = Number.isFinite(ground) ? ground : 0;
-        Quaternion.RotationYawPitchRollToRef(yaw, 0, 0, this.quaternion);
+        this.terrain.normalAt(this.position.x, this.position.z, _up);
+        if (!_up.lengthSquared() || !Number.isFinite(_up.y)) _up.set(0, 1, 0);
+        _up.normalize();
+        _forward.set(Math.sin(yaw), 0, Math.cos(yaw));
+        const slopeDot = Vector3.Dot(_forward, _up);
+        _forward.x -= _up.x * slopeDot;
+        _forward.y -= _up.y * slopeDot;
+        _forward.z -= _up.z * slopeDot;
+        if (_forward.lengthSquared() < 1e-6) _forward.set(0, 0, 1);
+        _forward.normalize();
+        Quaternion.FromLookDirectionRHToRef(_forward, _up, this.quaternion);
         this.position.y = safeGround + WHEEL_RADIUS + REST_LENGTH + clearance;
         for (const local of this.chassisSamples) {
             rotateVectorToRef(this.quaternion, local, _sample);
@@ -584,6 +598,20 @@ export class VehiclePhysics {
         let fx = LONG_STIFFNESS * wheel.longitudinalSlip;
         let fy = -LAT_STIFFNESS * wheel.slipAngle;
         const limit = this.friction * wheel.normalLoad;
+        // A slip-only tyre has a numerical dead zone at rest: engine torque
+        // first spins the wheel, and only a later physics step can move the
+        // chassis. On uneven snow the underbody can settle during that delay
+        // and make the SUV feel glued down. A real driveline transmits static
+        // traction immediately, so blend torque-at-the-contact-patch into the
+        // slip curve at walking speed. Above 3.2 m/s the regular tyre model is
+        // fully in charge again, preserving wheelspin and drift behaviour.
+        if (Math.abs(wheel.driveTorque) > 0.01) {
+            const launchBlend = 1 - smoothstep(
+                0.35, LAUNCH_FORCE_END_SPEED, Math.abs(vx)
+            );
+            const torqueForce = wheel.driveTorque / WHEEL_RADIUS;
+            fx += (torqueForce - fx) * launchBlend;
+        }
         const demand = Math.hypot(fx, fy);
         if (demand > limit && demand > 0) {
             const scale = limit / demand;

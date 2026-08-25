@@ -56,6 +56,7 @@ The project remains mostly plain static HTML, ES modules, Three.js, and a small 
 - `scripts/inplace_root_motion.py` removes unwanted horizontal root travel from animation exports.
 - `scripts/assemble_houses.py` builds the Dune village from modular pieces.
 - `docs/pipeline.md` records the asset and rigging pipeline.
+- `docs/world-rendering-playbook.md` records the performance, terrain and acceptance rules shared by every world.
 
 Type **dev** in a room to open the development panel. It exposes movement, camera, lighting, fog, exposure, asset quality, and character scale. The panel is deliberately absent from normal play.
 

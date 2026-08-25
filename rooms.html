@@ -296,14 +296,14 @@
 <div id="credit"></div>
 <div id="perf" title="Measured wall-clock frame rate, average frame time, one-percent-low FPS, and draw calls">measuring frame pace…</div>
 <div id="travel" data-input="keyboard" role="dialog" aria-modal="true" aria-label="Choose another place" aria-hidden="true">
-  <video class="travel-video" autoplay muted playsinline loop preload="auto" aria-hidden="true"><source src="assets/video/sansara-tab-pingpong.mp4" type="video/mp4"></video>
+  <video class="travel-video" muted playsinline loop preload="none" aria-hidden="true" data-src="assets/video/sansara-tab-pingpong.mp4"></video>
   <div class="travel-head"><span class="kicker">press tab to choose your world</span><span class="count" id="travelCount" aria-live="polite"></span></div>
   <span class="release" aria-label="Sansara release version">v0.5.1</span>
   <div class="rail" id="rail" aria-label="Places"></div>
   <div class="hint">hold tab · ← → to choose · release to travel</div>
 </div>
 <div id="wipe">
-  <video class="transition-video" autoplay muted playsinline loop preload="auto" aria-hidden="true"><source src="assets/video/sansara-atmosphere-pingpong.mp4" type="video/mp4"></video>
+  <video class="transition-video" autoplay muted playsinline loop preload="metadata" aria-hidden="true"><source src="assets/video/sansara-atmosphere-pingpong.mp4" type="video/mp4"></video>
   <div class="transition-copy">
     <span class="mark">Sansara</span><span>entering</span><b id="wipeName">another place</b>
     <div class="transition-progress">
@@ -313,7 +313,7 @@
   </div>
 </div>
 <div id="load">
-  <video class="load-video" autoplay muted playsinline loop preload="auto" aria-hidden="true"><source src="assets/video/sansara-atmosphere-pingpong.mp4" type="video/mp4"></video>
+  <video class="load-video" autoplay muted playsinline loop preload="metadata" aria-hidden="true"><source src="assets/video/sansara-atmosphere-pingpong.mp4" type="video/mp4"></video>
   <div class="weather" aria-hidden="true">
     <i class="glow"></i><i class="cloud c1"></i><i class="cloud c2"></i><i class="cloud c3"></i><i class="hill"></i>
   </div>
@@ -444,6 +444,11 @@ let travelOriginKey = ROOMS[params.get('current')] ? params.get('current') : nul
 const AUTO_OPEN_TRAVEL = params.get('travel') === '1';
 
 /* ========================= tuning params ======================== */
+/* Render scale ceiling. The room presets below were tuned on a desktop GPU and
+   ask for 2.0; on a Retina panel that is a 2560x1440 render target for a
+   1280x720 window — four times the pixels, for no visible gain. Presets get
+   clamped to this; the Asset quality slider can still be pushed past it. */
+const DEVICE_PIXEL_CEILING = Math.min(window.devicePixelRatio || 1, 1.25);
 const TUNE = {
   walkSpeed: 1.1, runSpeed: 3.6, accel: 28, decel: 20, airAccel: 7, turnRate: 13,
   gravity: 24, jumpVel: 5.8, jumpWindup: 0.12, landHold: 0.24, animRate: 1.0,
@@ -451,7 +456,11 @@ const TUNE = {
   // experimental panel edits, not part of this new baseline.
   camDist: 6.2, camHeight: 2.5, exposure: 0.32, fogDensity: 2.6, charScale: 1.0,
   envIntensity: 1.9, ambientIntensity: 0.8, hemiIntensity: 0.45,
-  keyIntensity: 0.55, fillIntensity: 0, assetQuality: 1.65,
+  keyIntensity: 0.55, fillIntensity: 0,
+  // Render scale. 1.65 was a desktop tuning value; on a Retina panel it means a
+  // 2112x1188 target for a 1280x720 window. Start near native and let the
+  // Asset quality slider push it back up on machines that can afford it.
+  assetQuality: DEVICE_PIXEL_CEILING,
 };
 const BASELINE_TUNE = {...TUNE};
 const TUNE_SPEC = [
@@ -1008,6 +1017,7 @@ async function loadRoom(key){
   // Start each room from the shared baseline, then apply room-specific
   // tuning where a world needs its own movement or camera feel.
   Object.assign(TUNE, BASELINE_TUNE, cfg.tune || {});
+  TUNE.assetQuality = Math.min(TUNE.assetQuality, DEVICE_PIXEL_CEILING);
   Object.assign(DEFAULTS, TUNE);
   showLoader(cfg.label);
   setProgress(0.02, 'opening');
@@ -1643,6 +1653,18 @@ const DEFAULT_THUMBS = Object.freeze({
   pool: 'assets/thumbnails/pool.jpg',
   dreamcore: 'assets/thumbnails/dreamcore.jpg',
 });
+const PALE_HORIZON_PREFETCH = 'experiments/pale-horizon/dist/models/f22-low.glb';
+let paleHorizonPrefetchStarted = false;
+function prefetchPaleHorizonAirframe(){
+  if (paleHorizonPrefetchStarted) return;
+  paleHorizonPrefetchStarted = true;
+  const link = document.createElement('link');
+  link.rel = 'prefetch';
+  link.as = 'fetch';
+  link.href = new URL(PALE_HORIZON_PREFETCH, location.href).href;
+  link.crossOrigin = 'anonymous';
+  document.head.appendChild(link);
+}
 const THUMB_KEY = 'sansara.thumbs.v2';
 let thumbs = {};
 try { thumbs = JSON.parse(localStorage.getItem(THUMB_KEY) || '{}'); } catch(e){ thumbs = {}; }
@@ -1711,6 +1733,16 @@ const IS_LOCAL = ['localhost','127.0.0.1',''].includes(location.hostname);
 const REDUCE_MOTION = matchMedia('(prefers-reduced-motion: reduce)');
 const roomKeys = ()=>Object.keys(ROOMS).filter(k=>IS_LOCAL || !ROOMS[k].local);
 let travelOpen = false, travelIdx = 0, switching = false, travelCommitted = false;
+function startLazyVideo(video){
+  if (!video || video.dataset.started) return;
+  video.dataset.started = '1';
+  const source = document.createElement('source');
+  source.src = video.dataset.src;
+  source.type = 'video/mp4';
+  video.appendChild(source);
+  video.load();
+  video.play().catch(()=>{});   // autoplay policy can refuse; the overlay reads fine without it
+}
 let pointerX = NaN, pointerY = NaN, travelInput = 'keyboard';
 // A Tab key released after cross-page navigation can arrive in this document.
 // Ignore that one release so a standalone world does not immediately bounce
@@ -1786,6 +1818,7 @@ function markSelected(scroll=false){
     }
   });
   const keys = roomKeys(), chosen = keys[travelIdx];
+  if (chosen === 'paleHorizon') prefetchPaleHorizonAirframe();
   document.getElementById('travelCount').textContent = chosen
     ? `${String(travelIdx+1).padStart(2,'0')} / ${String(keys.length).padStart(2,'0')}  ·  ${ROOMS[chosen].label}`
     : '';
@@ -1842,6 +1875,9 @@ function openTravel(){
   travelIdx = Math.max(0, roomKeys().indexOf(travelCurrentKey()));
   buildTravel();
   const travel = document.getElementById('travel');
+  // The backdrop only exists behind this overlay, so it stays unfetched until
+  // the first TAB rather than competing with the scene GLB on initial load.
+  startLazyVideo(travel.querySelector('.travel-video'));
   travel.classList.add('on');
   travel.setAttribute('aria-hidden','false');
   // Eight worlds no longer fit in one desktop row. Centre the current card
