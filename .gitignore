@@ -7,6 +7,7 @@ output/character.fbx
 
 # Internal working notes, kept local
 docs/*-design.md
+docs/superpowers/
 
 .DS_Store
 .claude/
