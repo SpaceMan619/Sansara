@@ -335,6 +335,8 @@
 </script>
 <script type="module">
 import * as THREE from 'three';
+import { pollPad } from './app/input/gamepad.js';
+import { renderHints, notePadActivity, onDeviceChange, installHintCss } from './app/input/hints.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
 /* ============================ rooms ============================
@@ -1234,6 +1236,14 @@ let roomStats = '';
 
 /* ========================== controller ========================= */
 const COYOTE = 0.12, JUMP_BUFFER = 0.15, RADIUS = 0.34;
+/* Stick tilt at which the character commits to a run. Below this the ramp
+   climbs to walk speed, above it to run speed, so the whole range from a
+   creep to a sprint lives on the stick and no sprint button is needed. */
+const RUN_TILT = 0.75;
+const analogSpeed = t => t <= RUN_TILT
+  ? TUNE.walkSpeed * (t / RUN_TILT)
+  : TUNE.walkSpeed + (TUNE.runSpeed - TUNE.walkSpeed) * ((t - RUN_TILT) / (1 - RUN_TILT));
+let padTravelHeld = false;
 /* The Jump asset is a complete take-off / airborne / recovery performance.
    Its useful beats are at 0.42 s (feet leave the floor) and 1.58 s
    (feet make contact again). Drive those beats from the controller rather
@@ -1374,6 +1384,30 @@ function tick(){
   perfFrames++;
   const dt = Math.min(clock.getDelta(), 0.05);
   elapsed += dt;
+
+  /* One poll per frame — pollPad() reports rising edges by diffing against the
+     previous frame, so a second call would swallow presses. */
+  const pad = pollPad();
+  if (pad){
+    if (pad.moveMag > 0 || pad.lookX || pad.lookY || pad.anyPressed()) notePadActivity(pad.brand);
+    if (pad.pressed('cross')) jumpBufT = JUMP_BUFFER;
+    if (!travelOpen && pad.pressed('triangle')){ dancing = !dancing; moonwalking = false; }
+    if (!travelOpen && pad.pressed('circle')){ moonwalking = !moonwalking; dancing = false; }
+    if (pad.pressed('square') && !travelOpen){ audioReady(); openTravel(); }
+    if (travelOpen){
+      if (pad.pressed('right')) selectTravel(travelIdx+1, {scroll:true});
+      if (pad.pressed('left'))  selectTravel(travelIdx-1, {scroll:true});
+      if (pad.pressed('circle')) closeTravel();
+      // Release-to-travel, mirroring hold-TAB on the keyboard.
+      if (padTravelHeld && !pad.down('square')) commitTravel(roomKeys()[travelIdx]);
+    }
+    padTravelHeld = pad.down('square');
+    const LOOK = 2.6;   // radians per second at full deflection
+    if (pad.lookX || pad.lookY){
+      camYaw -= pad.lookX * LOOK * dt;
+      camPitch = THREE.MathUtils.clamp(camPitch + pad.lookY * LOOK * dt, -0.30, 0.62);
+    }
+  } else padTravelHeld = false;
   if (!grid) { renderer.render(scene, camera); return; }
 
   moveFwd.set(-Math.sin(camYaw),0,-Math.cos(camYaw));
@@ -1384,10 +1418,25 @@ function tick(){
   if (keys['KeyD']) wish.add(moveRight);
   if (keys['KeyA']) wish.sub(moveRight);
   const emoting = dancing || moonwalking;
-  const hasInput = wish.lengthSq()>0 && !emoting;
-  if (hasInput) wish.normalize();
-  const running = (keys['ShiftLeft']||keys['ShiftRight']) && hasInput;
-  const targetSpeed = hasInput ? (running?TUNE.runSpeed:TUNE.walkSpeed) : 0;
+  /* Keys are all-or-nothing, so they always mean full tilt and keep the
+     shift-to-run model. The stick keeps its magnitude instead, which is the
+     entire point of analog movement. */
+  let tilt = 0, padDriven = false;
+  if (wish.lengthSq() > 0){ wish.normalize(); tilt = 1; }
+  else if (pad && pad.moveMag > 0){
+    wish.addScaledVector(moveFwd, -pad.moveY).addScaledVector(moveRight, pad.moveX);
+    if (wish.lengthSq() > 0){ wish.normalize(); tilt = pad.moveMag; padDriven = true; }
+  }
+  const hasInput = tilt > 0 && !emoting;
+  /* Branch on input, never on measured speed: a wall or drag can slow the body
+     to a crawl while a direction is still held, and a speed-based test drops
+     the character to idle mid-stride. */
+  const running = hasInput && (padDriven
+    ? tilt > RUN_TILT
+    : !!(keys['ShiftLeft']||keys['ShiftRight']));
+  const targetSpeed = !hasInput ? 0
+    : padDriven ? analogSpeed(tilt)
+    : (running ? TUNE.runSpeed : TUNE.walkSpeed);
 
   moveTarget.copy(wish).multiplyScalar(targetSpeed);
   const rate = (grounded ? (hasInput?TUNE.accel:TUNE.decel) : TUNE.airAccel) * dt;
@@ -1622,15 +1671,26 @@ function hideLoader(){
    `?` brings it back — a permanent strip is clutter in a space you're
    meant to be looking at. */
 let hudTimer = 0;
+/* One table drives both the hint bar and what the pad actually reads, so the
+   HUD cannot end up advertising a button that was renamed. Entries without a
+   `pad` are keyboard-only and drop out of the pad bar rather than showing a
+   control that does nothing. */
+const BINDINGS = [
+  { label:'move',   key:'WASD',  pad:'lstick'   },
+  { label:'run',    key:'shift'                 },
+  { label:'jump',   key:'space', pad:'cross'    },
+  { label:'travel', key:'tab',   pad:'square'   },
+  { label:'look',   key:'drag',  pad:'rstick'   },
+  { label:'dance',               pad:'triangle' },
+  { label:'dev',    key:'`'                     },
+];
 function buildHud(){
-  document.getElementById('hud').innerHTML =
-    `<span><b>WASD</b> move</span><i class="sep"></i>
-     <span><b>shift</b> run</span><i class="sep"></i>
-     <span><b>space</b> jump</span><i class="sep"></i>
-     <span><b>tab</b> travel</span><i class="sep"></i>
-     <span><b>drag</b> look</span><i class="sep"></i>
-     <span><b>\`</b> dev</span>`;
+  document.getElementById('hud').innerHTML = renderHints(BINDINGS);
 }
+installHintCss();
+// Swapping device rebuilds the bar and flashes it, so the change is visible
+// rather than something you discover later.
+onDeviceChange(()=>{ buildHud(); flashHud(2600); });
 function flashHud(ms = 4200){
   const hud = document.getElementById('hud');
   hud.classList.add('show');
