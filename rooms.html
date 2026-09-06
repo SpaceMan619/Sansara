@@ -444,6 +444,37 @@ const params = new URLSearchParams(location.search);
 let roomKey = ROOMS[params.get('room')] ? params.get('room') : 'dune';
 let travelOriginKey = ROOMS[params.get('current')] ? params.get('current') : null;
 const AUTO_OPEN_TRAVEL = params.get('travel') === '1';
+const SELECTOR_ENTRY = AUTO_OPEN_TRAVEL || !ROOMS[params.get('room')];
+const EXTERNAL_ROOMS = Object.freeze({
+  dune2: 'experiments/dark-snow/dist/index.html',
+  paleHorizon: 'experiments/pale-horizon/dist/index.html',
+});
+let worldReady = false;
+let avatarReady = null;
+function externalTarget(k){
+  const target = new URL(EXTERNAL_ROOMS[k], location.href);
+  target.searchParams.set('from', 'sansara');
+  return target.href;
+}
+async function prepareWorld(k){
+  avatarReady ||= loadAvatar().catch(error=>{ avatarReady = null; throw error; });
+  await avatarReady;
+  await loadRoom(k);
+  roomKey = k;
+  worldReady = true;
+  buildPanel();
+  renderer.setAnimationLoop(safeTick);
+}
+function showLoadFailure(error, k = roomKey){
+  console.error(error);
+  showLoader(ROOMS[k].label);
+  const phase = document.getElementById('loadPhase');
+  phase.textContent = 'Could not load this world. ';
+  const back = document.createElement('a');
+  back.href = '?travel=1';
+  back.textContent = 'Choose another world';
+  phase.appendChild(back);
+}
 
 /* ========================= tuning params ======================== */
 /* Render scale ceiling. The room presets below were tuned on a desktop GPU and
@@ -1016,17 +1047,9 @@ async function loadRoom(key){
   stopRoomLifecycle();
   if (loadToken !== roomLoadToken) return;
   const cfg = ROOMS[key];
-  // Start each room from the shared baseline, then apply room-specific
-  // tuning where a world needs its own movement or camera feel.
-  Object.assign(TUNE, BASELINE_TUNE, cfg.tune || {});
-  TUNE.assetQuality = Math.min(TUNE.assetQuality, DEVICE_PIXEL_CEILING);
-  Object.assign(DEFAULTS, TUNE);
   showLoader(cfg.label);
   setProgress(0.02, 'opening');
 
-  if (scene) disposeRoom(); else scene = new THREE.Scene();
-  // drop everything but the avatar so lighting doesn't accumulate per room
-  for (const child of [...scene.children]) if (child !== avatar && child !== blob) scene.remove(child);
 
   /* A room is either a file to load or a module that builds itself. Both
      hand back the same shape, so everything downstream is identical. */
@@ -1052,7 +1075,7 @@ async function loadRoom(key){
       setProgress(1, 'unavailable');
       document.getElementById('loadName').textContent = cfg.label + " wouldn't build";
       document.getElementById('loadPhase').textContent = e.message;
-      console.error(e); buildHud(); return;
+      throw e;
     }
   }
   try {
@@ -1065,13 +1088,21 @@ async function loadRoom(key){
     setProgress(1, 'unavailable');
     document.getElementById('loadName').textContent = `${cfg.label} isn't published here yet`;
     document.getElementById('loadPhase').textContent = 'not published here yet';
-    buildHud();
-    return;                     // keep the previous room's grid usable
+    throw e;
   }
   if (loadToken !== roomLoadToken){
     runRoomCleanup(builtCleanup);
     return;
   }
+  // Keep the previous geometry and tuning until the new assets have loaded.
+  if (scene) disposeRoom(); else scene = new THREE.Scene();
+  // drop everything but the avatar so lighting doesn't accumulate per room
+  for (const child of [...scene.children]) if (child !== avatar && child !== blob) scene.remove(child);
+  // Start each room from the shared baseline, then apply room-specific
+  // tuning where a world needs its own movement or camera feel.
+  Object.assign(TUNE, BASELINE_TUNE, cfg.tune || {});
+  TUNE.assetQuality = Math.min(TUNE.assetQuality, DEVICE_PIXEL_CEILING);
+  Object.assign(DEFAULTS, TUNE);
   setProgress(0.84, 'setting the light');
   roomRoot = built ? built.root : gltf.scene;
   devLights = { ambient:null, hemi:null, key:null, fill:null };
@@ -1397,7 +1428,7 @@ function tick(){
     if (travelOpen){
       if (pad.pressed('right')) selectTravel(travelIdx+1, {scroll:true});
       if (pad.pressed('left'))  selectTravel(travelIdx-1, {scroll:true});
-      if (pad.pressed('circle')) closeTravel();
+      if (pad.pressed('circle')) cancelTravel();
       // Release-to-travel, mirroring hold-TAB on the keyboard.
       if (padTravelHeld && !pad.down('square')) commitTravel(roomKeys()[travelIdx]);
     }
@@ -1808,7 +1839,7 @@ let pointerX = NaN, pointerY = NaN, travelInput = 'keyboard';
 // Ignore that one release so a standalone world does not immediately bounce
 // back into itself before the user has had a chance to move through the cards.
 let guardExternalTabRelease = AUTO_OPEN_TRAVEL;
-const travelCurrentKey = ()=>travelOriginKey || roomKey;
+const travelCurrentKey = ()=>travelOriginKey || (worldReady ? roomKey : null);
 function setTravelInput(source){
   travelInput = source;
   document.getElementById('travel').dataset.input = source;
@@ -1889,7 +1920,6 @@ function selectTravel(i, {scroll=false, sound=true, source='keyboard'}={}){
   const next = (i % count + count) % count;
   setTravelInput(source);
   if (next === travelIdx) return;
-  guardExternalTabRelease = false;
   travelIdx = next;
   markSelected(scroll);
   if (sound) soundMove();
@@ -1911,8 +1941,8 @@ function buildTravel(){
       <span class="idx">${String(i+1).padStart(2,'0')}</span>
       <span class="txt">${cfg.badge ? `<span class="lab">${cfg.badge}</span>` : ''}<span class="nm">${cfg.label}</span>
       <span class="bl">${cfg.blurb || ''}</span></span>`;
-    el.onclick = ()=>{ if (travelInput === 'pointer') commitTravel(k); };
-    el.onpointerdown = ()=>{ setTravelInput('pointer'); audioReady(); };
+    el.onclick = ()=>commitTravel(k);
+    el.onpointerdown = ()=>{ selectTravel(i, {source:'pointer'}); audioReady(); };
     el.onpointermove = e=>{
       if (!Number.isFinite(pointerX)){ pointerX=e.clientX; pointerY=e.clientY; return; }
       // Keyboard mode deliberately needs a larger physical gesture, so tiny
@@ -1952,12 +1982,16 @@ function closeTravel(){
   travel.classList.remove('on');
   travel.setAttribute('aria-hidden','true');
 }
+function cancelTravel(){
+  if (worldReady) closeTravel();
+  else commitTravel(travelOriginKey || roomKey);
+}
 function commitTravel(k){
   if (!travelOpen || travelCommitted || switching || !ROOMS[k]) return;
   travelCommitted = true;
   closeTravel();
   travelOriginKey = null;
-  if (k === roomKey){
+  if (k === roomKey && worldReady){
     history.replaceState(null,'',`?room=${k}`);
     return;
   }
@@ -1965,7 +1999,7 @@ function commitTravel(k){
   goTo(k);
 }
 async function goTo(k){
-  if (k === roomKey || switching || !ROOMS[k]) return;
+  if ((k === roomKey && worldReady) || switching || !ROOMS[k]) return;
   switching = true;
   const wipe = document.getElementById('wipe');
   const shot = thumbFor(k), tint = ROOMS[k].tint || tintFor(k);
@@ -1983,28 +2017,19 @@ async function goTo(k){
     // Keep one uninterrupted transition on screen; loadRoom feeds its real
     // progress into this layer instead of opening a second loader beneath it.
     wipe.classList.add('loading');
-    roomKey = k;
+    if (EXTERNAL_ROOMS[k]) {
+      stopRoomLifecycle();
+      location.assign(externalTarget(k));
+      return;
+    }
+    await prepareWorld(k);
     history.replaceState(null,'',`?room=${k}`);
-    if (k === 'dune2' || k === 'paleHorizon') stopRoomLifecycle();
-    if (k === 'dune2') {
-      // Dark Snow is the first room to use the forked Babylon/WebGPU renderer.
-      // It lives as a static Vite build so Sansara's selector remains the
-      // threshold while the experiment keeps its complete settings UI.
-      const target = new URL('experiments/dark-snow/dist/index.html', location.href);
-      target.searchParams.set('from', 'sansara');
-      location.assign(target.href);
-      return;
-    }
-    if (k === 'paleHorizon') {
-      const target = new URL('experiments/pale-horizon/dist/index.html', location.href);
-      target.searchParams.set('from', 'sansara');
-      location.assign(target.href);
-      return;
-    }
-    await loadRoom(k);
     wipe.classList.add('reveal');
     await new Promise(r=>setTimeout(r, REDUCE_MOTION.matches ? 60 : 720));
     flashHud(2600);
+  } catch(error){
+    switching = false;
+    showLoadFailure(error, k);
   } finally {
     wipe.classList.remove('on','reveal','loading');
     switching = false;
@@ -2014,13 +2039,14 @@ async function goTo(k){
 addEventListener('keydown', e=>{
   if (e.code === 'Tab'){
     e.preventDefault(); audioReady();
+    if (!e.repeat) guardExternalTabRelease = false;
     openTravel(); return;
   }
   if (!travelOpen) return;
   const ks = roomKeys();
   if (e.code === 'ArrowRight'){ selectTravel(travelIdx+1, {scroll:true}); e.preventDefault(); }
   if (e.code === 'ArrowLeft'){ selectTravel(travelIdx-1, {scroll:true}); e.preventDefault(); }
-  if (e.code === 'Escape'){ closeTravel(); e.preventDefault(); }
+  if (e.code === 'Escape'){ cancelTravel(); e.preventDefault(); }
   if (e.code === 'Enter'){ commitTravel(ks[travelIdx]); e.preventDefault(); }
 });
 addEventListener('keyup', e=>{
@@ -2033,7 +2059,7 @@ addEventListener('keyup', e=>{
 addEventListener('blur', ()=>{
   for (const k in keys) keys[k] = false;
   jumpBufT = 0;
-  if (travelOpen) closeTravel();
+  if (travelOpen && worldReady) closeTravel();
 });
 addEventListener('visibilitychange', ()=>{
   // A background tab may be throttled for seconds. Start a clean measurement
@@ -2168,14 +2194,22 @@ addEventListener('resize',()=>{ camera.aspect=innerWidth/innerHeight;
 (async ()=>{
   try {
     scene = new THREE.Scene();
-    await loadAvatar();
-    await loadRoom(roomKey);
-    buildPanel();
-    renderer.setAnimationLoop(safeTick);
-    if (AUTO_OPEN_TRAVEL) requestAnimationFrame(openTravel);
+    if (SELECTOR_ENTRY){
+      hideLoader();
+      openTravel();
+      // Keep controller polling alive before any world or avatar is loaded.
+      renderer.setAnimationLoop(safeTick);
+    } else if (EXTERNAL_ROOMS[roomKey]){
+      location.replace(externalTarget(roomKey));
+    } else {
+      switching = true;
+      await prepareWorld(roomKey);
+    }
   } catch(err){
-    document.getElementById('load').textContent = 'startup error: ' + err.message;
-    console.error(err);
+    switching = false;
+    showLoadFailure(err);
+  } finally {
+    switching = false;
   }
 })();
 </script>
