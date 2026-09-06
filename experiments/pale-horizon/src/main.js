@@ -30,6 +30,9 @@ const ui = Object.fromEntries([...document.querySelectorAll("[id]")].map((el) =>
 const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
 const damp = (current, target, rate, dt) => current + (target - current) * (1 - Math.exp(-rate * dt));
 const RAD = Math.PI / 180;
+const inspection = new URLSearchParams(location.search).get('inspect');
+const inspectionPosition = new Vector3(-1450, 760, 1950);
+const inspectionTarget = new Vector3(-950, 220, 5350);
 
 function openSansaraSelector(currentWorld) {
   const marker = "/experiments/";
@@ -55,9 +58,9 @@ const defaults = Object.freeze({
   cameraResponse: 4.5,
   assists: true,
   sensitivity: 1,
-  sun: 4.2,
-  exposure: 0.96,
-  fog: 0.000075,
+  sun: 2.8,
+  exposure: 0.90,
+  fog: 0.00014,
   audio: true,
 });
 const settings = { ...defaults };
@@ -71,7 +74,7 @@ function withTimeout(promise, timeoutMs) {
 
 async function createEngine() {
   let gpu = null;
-  if (navigator.gpu) {
+  if (navigator.gpu && new URLSearchParams(location.search).get('renderer') !== 'webgl') {
     try {
       if (await withTimeout(WebGPUEngine.IsSupportedAsync, 1500)) {
         gpu = new WebGPUEngine(canvas, { antialias: true, powerPreference: "high-performance" });
@@ -105,7 +108,7 @@ camera.fov = 53 * RAD;
 // 15 cm near plane. Moving it out improves depth precision across the 12 km
 // flight range and stops distant coplanar surfaces from trading pixels.
 camera.minZ = 0.5;
-camera.maxZ = 12000;
+camera.maxZ = 28000;
 camera.inputs.clear();
 scene.activeCamera = camera;
 // Run exposure and ACES after the whole frame. Babylon normally folds image
@@ -120,8 +123,8 @@ const imageProcessing = new ImageProcessingPostProcess(
 const atmosphere = await createAtmosphere(scene, {
   // Same physical sun as Dark Snow, composed ahead of the runway so the
   // solar disc and long raking light are present in the opening view.
-  azimuth: 28,
-  elevation: 11.5,
+  azimuth: 310,
+  elevation: 14,
   // Dark Snow's sky is authored in HDR and normally viewed through its
   // 0.105-exposure AgX pass. Pale Horizon uses Babylon's ACES camera, so feed
   // the LUT the equivalent radiance while retaining full-strength sunlight
@@ -130,7 +133,7 @@ const atmosphere = await createAtmosphere(scene, {
   warmth: 1,
 });
 const hemi = new HemisphericLight("sky-fill", new Vector3(0.08, 1, 0.04), scene);
-hemi.intensity = 1.28;
+hemi.intensity = 1.1;
 hemi.diffuse = new Color3(0.68, 0.79, 0.91);
 hemi.groundColor = new Color3(0.28, 0.31, 0.27);
 const sun = new DirectionalLight("low-sun", atmosphere.sunDirection.scale(-1), scene);
@@ -149,6 +152,7 @@ shadows.bias = 0.00045;
 shadows.normalBias = 0.025;
 
 const terrain = new EndlessTerrain(scene);
+await terrain.ready;
 const water = new EndlessWater(scene);
 
 const runway = MeshBuilder.CreateGround("runway", { width: 72, height: 1920 }, scene);
@@ -156,7 +160,7 @@ runway.position.set(0, 0.08, 180);
 const runwayMat = new StandardMaterial("runway-mat", scene);
 runwayMat.diffuseColor = new Color3(0.26, 0.30, 0.30);
 runwayMat.emissiveColor = new Color3(0.025, 0.03, 0.03);
-runwayMat.specularColor = new Color3(0.16, 0.17, 0.16);
+runwayMat.specularColor = new Color3(0.025, 0.027, 0.026);
 // Keep the visual runway above the flat collision terrain in depth space.
 // The unit bias remains stable at the far end where an 8 cm physical offset
 // alone is smaller than a depth-buffer step.
@@ -500,11 +504,33 @@ scene.onBeforeRenderObservable.add(() => {
     sensitivity: settings.sensitivity,
     assists: settings.assists,
   });
-  terrain.update(flight.position);
-  water.update(flight.position, performance.now() * 0.001);
+  const landscapePosition = inspection === 'valley' ? inspectionPosition : flight.position;
+  terrain.update(landscapePosition);
+  water.update(landscapePosition, performance.now() * 0.001);
   atmosphere.render(camera, performance.now() * 0.001);
   updatePresentation(frame);
+  if (inspection === 'valley') {
+    camera.position.copyFrom(inspectionPosition);
+    camera.setTarget(inspectionTarget);
+  }
 });
+// Opt-in, DOM-readable performance evidence without a permanent HUD overlay.
+if (inspection) {
+  const frameTimes = new Float32Array(120);
+  let sample = 0;
+  scene.onAfterRenderObservable.add(() => {
+    frameTimes[sample++] = engine.getDeltaTime();
+    if (sample < frameTimes.length) return;
+    sample = 0;
+    const sorted = frameTimes.slice().sort();
+    canvas.dataset.performance = JSON.stringify({
+      fps: Math.round(engine.getFps()), p99Ms: +sorted[118].toFixed(1),
+      terrainVertices: terrain.vertexCount,
+      generationMs: +terrain.generationMs.toFixed(1), uploadMs: +terrain.uploadMs.toFixed(1),
+      worker: !!terrain.worker,
+    });
+  });
+}
 engine.runRenderLoop(() => scene.render());
 requestAnimationFrame(() => { void streamAircraft(); });
 

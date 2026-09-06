@@ -79,6 +79,7 @@ function fbm(x, z, octaves, gain = 0.5, lacunarity = 2.03) {
 const WATER_CELL_SIZE = 9000;
 const RIVER_WATER_RADIUS = 245;
 const RIVER_VALLEY_RADIUS = 1450;
+const lakeCache = new Map();
 
 export function riverCenterXAt(z) {
   // Keep the opening runway in a dry mountain basin. The river becomes visible
@@ -89,21 +90,26 @@ export function riverCenterXAt(z) {
 }
 
 function lakeBasinAt(gx, gz) {
+  const key = `${gx}:${gz}`;
+  if (lakeCache.has(key)) return lakeCache.get(key);
+  if (lakeCache.size > 256) lakeCache.clear();
   const seed = hash2(gx, gz);
   // Sparse enough that a flight reads distinct lakes rather than flooded
   // noise. The old 75% placement rate was the main visual failure.
-  if ((seed & 7) > 2) return null;
+  if ((seed & 7) > 2) { lakeCache.set(key, null); return null; }
   const cx = (gx + 0.22 + ((seed >>> 4) & 1023) / 1820) * WATER_CELL_SIZE;
   const cz = (gz + 0.22 + ((seed >>> 14) & 1023) / 1820) * WATER_CELL_SIZE;
   // Keep the authored runway basin dry and readable on first load.
   if (Math.abs(cx) < 1700 && Math.abs(cz - RUNWAY_CENTER_Z) < 2800) return null;
-  return {
+  const basin = {
     id: `${gx}:${gz}`,
     cx,
     cz,
     radiusX: 1050 + ((seed >>> 8) & 255) * 3.2,
     radiusZ: 850 + ((seed >>> 20) & 255) * 3.4,
   };
+  lakeCache.set(key, basin);
+  return basin;
 }
 
 function forNearbyLakes(x, z, visitor) {
@@ -230,7 +236,26 @@ export function terrainHeight(x, z) {
   ) * 20;
   const detail = fbm(x * 0.0032 + 3.2, z * 0.0032 - 8.7, 2, 0.44) * 5.0;
 
-  let raw = continental + mountains + rolling + drainage + outcrop + detail - 12;
+  // Two long, asymmetric ranges give the flight a readable valley and a
+  // destination skyline. Their broad bases remain smooth at the 44.8 m mesh
+  // spacing; fine noise never drives the large mountain displacement.
+  const valleyAxis = Math.sin(z * 0.00022) * 420;
+  const eastDistance = (x - valleyAxis - 2250) / 1350;
+  const westDistance = (x - valleyAxis + 4200) / 1750;
+  const eastCrest = 900 + 430 * noise2(z * 0.00048 + 12, 6.7)
+    + 210 * noise2(z * 0.0011 - 8, 19.2);
+  const westCrest = 1120 + 380 * noise2(z * 0.00039 - 4, 31.8);
+  const ranges = Math.exp(-eastDistance * eastDistance) * eastCrest
+    + Math.exp(-westDistance * westDistance) * westCrest;
+  const rockRibs = Math.abs(noise2(x * 0.0013 + z * 0.00045, z * 0.0009))
+    * Math.min(100, ranges * 0.12);
+  // The valley floor approaches runway elevation gradually, not via a cliff
+  // at the asphalt edge. This keeps the opening takeoff corridor clear.
+  const basin = smooth01(Math.abs(x - valleyAxis) / 1400);
+  const headwall = Math.exp(-(((z - 7500) / 1800) ** 2) - ((x + 800) / 3200) ** 2)
+    * (1050 + noise2(x * 0.0008 + 4, z * 0.0006) * 260);
+  let raw = (continental + mountains + rolling + drainage + ranges - rockRibs + outcrop + detail)
+    * basin + headwall + 2;
   // Natural noise stays above the water plane. Purpose-built bowls then lower
   // only the river and lake centres, with several hundred metres of bank run.
   raw = carveWaterBodies(Math.max(raw, WATER_LEVEL + 12), x, z);

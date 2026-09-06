@@ -6,6 +6,7 @@ import { ShaderLanguage } from "@babylonjs/core/Materials/shaderLanguage.js";
 import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder.js";
 import { Vector2, Vector3 } from "@babylonjs/core/Maths/math.vector.js";
 import { Color3 } from "@babylonjs/core/Maths/math.color.js";
+import { createFallbackSky } from './fallbackSky.js';
 
 // Pale Horizon now uses Dark Snow's actual atmospheric scattering and solar
 // shader sources. Keeping these as imports, rather than rewritten copies, means
@@ -24,11 +25,17 @@ ShaderStore.IncludesShadersStoreWGSL.snowShading = shadingSource;
 ShaderStore.IncludesShadersStoreWGSL.snowRidge = ridgeSource;
 ShaderStore.ShadersStoreWGSL.paleDarkSkyBakePixelShader = skyBakeSource;
 ShaderStore.ShadersStoreWGSL.paleDarkSkyVertexShader = skyVertexSource;
-ShaderStore.ShadersStoreWGSL.paleDarkSkyPixelShader = skyFragmentSource;
+// From flight altitude the ground hemisphere of the shared LUT is visible
+// beyond the terrain. Extend its horizon radiance instead of a black abyss.
+ShaderStore.ShadersStoreWGSL.paleDarkSkyPixelShader = skyFragmentSource.replace(
+  'let uv = dirToLatLong(dir);',
+  'let uv = dirToLatLong(normalize(vec3f(dir.x, max(dir.y, 0.008), dir.z)));',
+);
 
 const SUN_SCALE_BASE = 5.5;
 const DEG = Math.PI / 180;
 const EMPTY_SH = new Float32Array(36);
+const WIND = new Vector2(0.35, 0.94);
 
 function waitUntilReady(object, label) {
   return new Promise((resolve, reject) => {
@@ -181,7 +188,7 @@ export class DarkSnowAtmosphere {
     material.setColor3("sunColor", this.sunColor);
     material.setFloat("sunIntensity", this.sunScale);
     material.setFloat("time", time);
-    material.setVector2("windDir", new Vector2(0.35, 0.94));
+    material.setVector2("windDir", WIND);
     material.setFloat("cloudAmount", 0.30);
     material.setColor3("sunRadiance", this.sunRadiance);
     material.setFloat("ambientIntensity", 0);
@@ -200,6 +207,7 @@ export class DarkSnowAtmosphere {
 }
 
 export async function createAtmosphere(scene, options) {
+  if (!scene.getEngine().isWebGPU) return createFallbackSky(scene, options);
   const atmosphere = new DarkSnowAtmosphere(scene, options);
   await atmosphere.solve();
   return atmosphere;

@@ -3,6 +3,8 @@ import { VertexBuffer } from "@babylonjs/core/Buffers/buffer.js";
 import { VertexData } from "@babylonjs/core/Meshes/mesh.vertexData.js";
 import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial.js";
 import { Color3 } from "@babylonjs/core/Maths/math.color.js";
+import { FresnelParameters } from "@babylonjs/core/Materials/fresnelParameters.js";
+import { createSurfaceTexture } from "./surfaceTextures.js";
 
 import {
   lakeBasinsNear,
@@ -21,14 +23,25 @@ const MAX_LAKES = 12;
 
 function makeMaterial(scene) {
   const material = new StandardMaterial("pale-local-water-material", scene);
-  material.diffuseColor = new Color3(0.055, 0.19, 0.25);
+  material.diffuseColor = new Color3(0.065, 0.27, 0.32);
+  material.bumpTexture = createSurfaceTexture(scene, true);
+  material.bumpTexture.uScale = 2;
+  material.bumpTexture.vScale = 2;
+  material.diffuseFresnelParameters = new FresnelParameters();
+  material.diffuseFresnelParameters.leftColor = new Color3(0.44, 0.64, 0.72);
+  material.diffuseFresnelParameters.rightColor = new Color3(0.13, 0.37, 0.42);
+  material.diffuseFresnelParameters.power = 3;
   material.ambientColor = new Color3(0.08, 0.20, 0.25);
   material.specularColor = new Color3(0.58, 0.62, 0.58);
-  material.emissiveColor = new Color3(0.008, 0.023, 0.029);
+  material.emissiveColor = new Color3(0.35, 0.48, 0.55);
+  material.emissiveFresnelParameters = new FresnelParameters();
+  material.emissiveFresnelParameters.leftColor = Color3.White();
+  material.emissiveFresnelParameters.rightColor = new Color3(0.015, 0.03, 0.04);
+  material.emissiveFresnelParameters.power = 5;
   material.specularPower = 112;
-  material.alpha = 0.91;
+  material.alpha = 1;
   material.backFaceCulling = true;
-  material.needDepthPrePass = true;
+  material.needDepthPrePass = false;
   return material;
 }
 
@@ -181,13 +194,12 @@ export class EndlessWater {
       }
     }
 
-    // Reserved for subtle UV motion once the water material has a normal map.
-    void elapsedSeconds;
+    this.material.bumpTexture.uOffset = (elapsedSeconds * 0.003) % 1;
   }
 
   dispose() {
     this.river.mesh.dispose(false, false);
     for (const lake of this.lakes) lake.dispose(false, false);
-    this.material.dispose();
+    this.material.dispose(false, true);
   }
 }
